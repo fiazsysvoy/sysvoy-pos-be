@@ -1,16 +1,34 @@
 import { Request, Response } from "express";
 import { UserService } from "./user.service.js";
-import { updateUserSchema, userIdParamSchema } from "./user.schema.js";
+import {
+  getUsersQuerySchema,
+  updateUserSchema,
+  userIdParamSchema,
+} from "./user.schema.js";
 
 const userService = new UserService();
 
 // GET /users
-export const getUsers = async (_req: Request, res: Response) => {
-  const users = await userService.getAll();
-  res.json(users);
+export const getUsers = async (req: Request, res: Response) => {
+  const parsed = getUsersQuerySchema.safeParse(req.query);
+
+  if (!parsed.success) {
+    return res
+      .status(400)
+      .json({ errors: parsed.error.issues.map((i) => i.message) });
+  }
+
+  const { pageIndex, pageSize, search } = parsed.data;
+
+  const result = await userService.getAll({
+    pageIndex,
+    pageSize,
+    search,
+  });
+  res.json(result);
 };
 
-// GET /users/:id 
+// GET /users/:id
 export const getUserById = async (req: Request, res: Response) => {
   const parsed = userIdParamSchema.safeParse(req.params);
   if (!parsed.success) {

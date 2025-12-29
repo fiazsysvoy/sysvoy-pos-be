@@ -1,4 +1,4 @@
-import { prisma } from "../lib/prisma.js";
+import { prismaClient } from "../lib/prisma.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 
@@ -6,7 +6,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "dev-secret";
 
 export class AuthService {
   async signup(email: string, password: string) {
-    const userExists = await prisma.user.findUnique({
+    const userExists = await prismaClient.user.findUnique({
       where: { email },
     });
 
@@ -16,7 +16,7 @@ export class AuthService {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = await prisma.user.create({
+    const user = await prismaClient.user.create({
       data: {
         email,
         password: hashedPassword,
@@ -28,7 +28,7 @@ export class AuthService {
   }
 
   async signin(email: string, password: string) {
-    const user = await prisma.user.findUnique({
+    const user = await prismaClient.user.findUnique({
       where: { email },
     });
 
@@ -55,12 +55,12 @@ export class AuthService {
     name?: string,
     role?: "ADMIN" | "STAFF",
   ) {
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    const existingUser = await prismaClient.user.findUnique({ where: { email } });
     if (existingUser) throw new Error("User already exists");
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = await prisma.user.create({
+    const user = await prismaClient.user.create({
       data: {
         email,
         password: hashedPassword,

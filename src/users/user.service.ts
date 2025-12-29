@@ -1,21 +1,66 @@
 import bcrypt from "bcrypt";
-import { prisma } from "../lib/prisma.js";
+import { prismaClient } from "../lib/prisma.js";
+import { Prisma as PrismaTypes } from "../../generated/prisma/client.js"; // for types
+
+interface GetUsersOptions {
+  pageIndex: number;
+  pageSize: number;
+  search?: string;
+}
 
 export class UserService {
-  getAll() {
-    return prisma.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        createdAt: true,
+  async getAll({ pageIndex, pageSize, search }: GetUsersOptions) {
+    const skip = pageIndex * pageSize; // 0-based pageIndex
+
+    const where: PrismaTypes.UserWhereInput | undefined = search
+      ? {
+          OR: [
+            {
+              email: {
+                contains: search,
+                mode: PrismaTypes.QueryMode.insensitive,
+              },
+            },
+            {
+              name: {
+                contains: search,
+                mode: PrismaTypes.QueryMode.insensitive,
+              },
+            },
+          ],
+        }
+      : undefined;
+
+    const [users, total] = await Promise.all([
+      prismaClient.user.findMany({
+        where,
+        skip,
+        take: pageSize,
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          createdAt: true,
+        },
+      }),
+      prismaClient.user.count({ where }),
+    ]);
+
+    return {
+      meta: {
+        total,
+        pageIndex,
+        pageSize,
+        pageCount: Math.ceil(total / pageSize),
       },
-    });
+      data: users,
+    };
   }
 
   getById(id: string) {
-    return prisma.user.findUnique({
+    return prismaClient.user.findUnique({
       where: { id },
       select: {
         id: true,
@@ -32,7 +77,7 @@ export class UserService {
       data.password = await bcrypt.hash(data.password, 10);
     }
 
-    return prisma.user.update({
+    return prismaClient.user.update({
       where: { id },
       data,
       select: {
@@ -45,6 +90,6 @@ export class UserService {
   }
 
   async delete(id: string) {
-    await prisma.user.delete({ where: { id } });
+    await prismaClient.user.delete({ where: { id } });
   }
 }

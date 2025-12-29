@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { verifyJwt, JwtPayload } from "../auth/jwt.util.js";
-import { prisma } from "../lib/prisma.js";
+import { prismaClient } from "../lib/prisma.js";
 
 interface AuthRequest extends Request {
   user?: JwtPayload;
@@ -35,7 +35,7 @@ export const requireAdmin = (
 ) => {
   requireAuth(req, res, async () => {
     // Fetch user from DB to get latest role
-    const user = await prisma.user.findUnique({
+    const user = await prismaClient.user.findUnique({
       where: { id: req.user?.userId },
     });
 
