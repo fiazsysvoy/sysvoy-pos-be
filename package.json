@@ -3,7 +3,8 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "seed-admin": "tsx scripts/seed-admin.ts"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
