@@ -1,13 +1,14 @@
 import { Request, Response, NextFunction } from "express";
 import { verifyJwt, JwtPayload } from "../auth/jwt.util.js";
 import { prismaClient } from "../lib/prisma.js";
+import { User } from "../../generated/prisma/client.js";
 
 interface AuthRequest extends Request {
-  user?: JwtPayload;
+  user?: User; // user will be attached after authentication
 }
 
 // Middleware: verify token
-export const requireAuth = (
+export const requireAuth = async (
   req: AuthRequest,
   res: Response,
   next: NextFunction,
@@ -20,7 +21,18 @@ export const requireAuth = (
 
     const token = authHeader.split(" ")[1];
     const payload = verifyJwt(token);
-    req.user = payload; // will not contain updated user info, after jwt is issued
+
+    if (!payload || !payload.userId)
+      return res.status(401).json({ message: "Invalid token" });
+
+    // Fetch full user from DB
+    const user = await prismaClient.user.findUnique({
+      where: { id: payload.userId },
+    });
+
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    req.user = user;
     next();
   } catch (err: any) {
     res.status(401).json({ message: "Invalid or expired token" });
@@ -34,13 +46,7 @@ export const requireAdmin = (
   next: NextFunction,
 ) => {
   requireAuth(req, res, async () => {
-    // Fetch user from DB to get latest role
-    const user = await prismaClient.user.findUnique({
-      where: { id: req.user?.userId },
-    });
-
-    console.log(user);
-    if (user?.role !== "ADMIN") {
+    if (req.user?.role !== "ADMIN") {
       return res.status(403).json({ message: "Forbidden: Admins only" });
     }
     next();

@@ -21,11 +21,48 @@ enum Role {
 
 // User model
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String?
-  role      Role     @default(STAFF) // default role is STAFF
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String     @id @default(uuid())
+  email      String     @unique
+  password   String
+  name       String?
+  role       Role       @default(STAFF)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  categories Category[] @relation("UserCategories")
+  products   Product[]  @relation("UserProducts")
+}
+
+model Category {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  products    Product[]
+  createdBy   User?     @relation("UserCategories", fields: [createdById], references: [id])
+  createdById String?
+}
+
+model Product {
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  price       Float
+  stock       Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  category    Category  @relation(fields: [categoryId], references: [id])
+  categoryId  String
+
+  createdBy   User?     @relation("UserProducts", fields: [createdById], references: [id])
+  createdById String?
+  
+  // Index for name
+  @@index([name])
+  
+  // Index for categoryId
+  @@index([categoryId])
 }

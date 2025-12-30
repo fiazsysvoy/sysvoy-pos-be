@@ -55,7 +55,9 @@ export class AuthService {
     name?: string,
     role?: "ADMIN" | "STAFF",
   ) {
-    const existingUser = await prismaClient.user.findUnique({ where: { email } });
+    const existingUser = await prismaClient.user.findUnique({
+      where: { email },
+    });
     if (existingUser) throw new Error("User already exists");
 
     const hashedPassword = await bcrypt.hash(password, 10);
