@@ -37,6 +37,8 @@ model Category {
   id          String    @id @default(uuid())
   name        String    @unique
   description String?
+  imageUrl      String?    // Cloudinary URL
+  imagePublicId String?    // Cloudinary public ID
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 

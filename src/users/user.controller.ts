@@ -59,7 +59,10 @@ export const updateUser = async (req: Request, res: Response) => {
       });
     }
 
-    const user = await userService.update(paramsParsed.data.id, bodyParsed.data);
+    const user = await userService.update(
+      paramsParsed.data.id,
+      bodyParsed.data,
+    );
 
     res.status(200).json({ message: "User updated", user });
   } catch (error) {

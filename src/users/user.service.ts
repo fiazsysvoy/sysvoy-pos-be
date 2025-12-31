@@ -81,7 +81,7 @@ export class UserService {
     if (!existingUser) {
       throw new HttpError("User not found", 404);
     }
-    
+
     return prismaClient.$transaction(async (tx) => {
       // If email is being updated, check uniqueness
       if (data.email && data.email !== existingUser.email) {
