@@ -74,25 +74,45 @@ export class UserService {
   }
 
   async update(id: string, data: any) {
-    // check if user exists
-    const existingUser = await this.getById(id);
+    const existingUser = await prismaClient.user.findUnique({
+      where: { id },
+    });
+
     if (!existingUser) {
       throw new HttpError("User not found", 404);
     }
+    
+    return prismaClient.$transaction(async (tx) => {
+      // If email is being updated, check uniqueness
+      if (data.email && data.email !== existingUser.email) {
+        const emailExists = await tx.user.findFirst({
+          where: {
+            email: data.email,
+            NOT: { id }, // exclude current user
+          },
+        });
 
-    if (data.password) {
-      data.password = await bcrypt.hash(data.password, 10);
-    }
+        if (emailExists) {
+          throw new HttpError("Email already in use", 409);
+        }
+      }
 
-    return prismaClient.user.update({
-      where: { id },
-      data,
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-      },
+      // Hash password if present
+      if (data.password) {
+        data.password = await bcrypt.hash(data.password, 10);
+      }
+
+      // Update user
+      return tx.user.update({
+        where: { id },
+        data,
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+        },
+      });
     });
   }
 
