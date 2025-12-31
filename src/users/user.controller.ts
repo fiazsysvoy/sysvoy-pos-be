@@ -5,6 +5,7 @@ import {
   updateUserSchema,
   userIdParamSchema,
 } from "./user.schema.js";
+import { HttpError } from "../utils/HttpError.js";
 
 const userService = new UserService();
 
@@ -45,30 +46,49 @@ export const getUserById = async (req: Request, res: Response) => {
 
 // PUT /users/:id
 export const updateUser = async (req: Request, res: Response) => {
-  const paramsParsed = userIdParamSchema.safeParse(req.params);
-  const bodyParsed = updateUserSchema.safeParse(req.body);
+  try {
+    const paramsParsed = userIdParamSchema.safeParse(req.params);
+    const bodyParsed = updateUserSchema.safeParse(req.body);
 
-  if (!paramsParsed.success || !bodyParsed.success) {
-    return res.status(400).json({
-      errors: [
-        ...(paramsParsed.error?.issues ?? []),
-        ...(bodyParsed.error?.issues ?? []),
-      ],
-    });
+    if (!paramsParsed.success || !bodyParsed.success) {
+      return res.status(400).json({
+        errors: [
+          ...(paramsParsed.error?.issues ?? []),
+          ...(bodyParsed.error?.issues ?? []),
+        ],
+      });
+    }
+
+    const user = await userService.update(paramsParsed.data.id, bodyParsed.data);
+
+    res.status(200).json({ message: "User updated", user });
+  } catch (error) {
+    if (error instanceof HttpError) {
+      return res.status(error.statusCode).json({
+        message: error.message,
+      });
+    }
+
+    res.status(500).json({ message: "Internal server error" });
   }
-
-  const user = await userService.update(paramsParsed.data.id, bodyParsed.data);
-
-  res.json({ message: "User updated", user });
 };
 
 // DELETE /users/:id
 export const deleteUser = async (req: Request, res: Response) => {
-  const parsed = userIdParamSchema.safeParse(req.params);
-  if (!parsed.success) {
-    return res.status(400).json({ errors: parsed.error.issues });
-  }
+  try {
+    const parsed = userIdParamSchema.safeParse(req.params);
+    if (!parsed.success) {
+      return res.status(400).json({ errors: parsed.error.issues });
+    }
 
-  await userService.delete(parsed.data.id);
-  res.status(204).send();
+    await userService.delete(parsed.data.id);
+    res.status(204).send();
+  } catch (error) {
+    if (error instanceof HttpError) {
+      return res.status(error.statusCode).json({
+        message: error.message,
+      });
+    }
+    res.status(500).json({ message: "Internal server error" });
+  }
 };

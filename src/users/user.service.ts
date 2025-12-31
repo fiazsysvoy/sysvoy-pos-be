@@ -1,6 +1,7 @@
 import bcrypt from "bcrypt";
 import { prismaClient } from "../lib/prisma.js";
 import { Prisma as PrismaTypes } from "../../generated/prisma/client.js"; // for types
+import { HttpError } from "../utils/HttpError.js";
 
 interface GetUsersOptions {
   pageIndex: number;
@@ -73,6 +74,12 @@ export class UserService {
   }
 
   async update(id: string, data: any) {
+    // check if user exists
+    const existingUser = await this.getById(id);
+    if (!existingUser) {
+      throw new HttpError("User not found", 404);
+    }
+
     if (data.password) {
       data.password = await bcrypt.hash(data.password, 10);
     }
@@ -90,6 +97,12 @@ export class UserService {
   }
 
   async delete(id: string) {
+    // check if user exists
+    const existingUser = await this.getById(id);
+    if (!existingUser) {
+      throw new HttpError("User not found", 404);
+    }
+
     await prismaClient.user.delete({ where: { id } });
   }
 }
