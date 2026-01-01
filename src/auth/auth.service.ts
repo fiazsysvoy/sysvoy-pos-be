@@ -48,31 +48,4 @@ export class AuthService {
     const { password: _, ...safeUser } = user;
     return { token, user: safeUser }; // without refresh token for now
   }
-
-  async createUser(
-    email: string,
-    password: string,
-    name?: string,
-    role?: "ADMIN" | "STAFF",
-  ) {
-    const existingUser = await prismaClient.user.findUnique({
-      where: { email },
-    });
-    if (existingUser) throw new Error("User already exists");
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const user = await prismaClient.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        name,
-        role: role || "STAFF",
-      },
-    });
-
-    // Remove password before returning
-    const { password: _, ...safeUser } = user;
-    return safeUser;
-  }
 }

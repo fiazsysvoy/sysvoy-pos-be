@@ -1,17 +1,17 @@
 import { z } from "zod";
 
 export const categoryIdParamSchema = z.object({
-  id: z.string().uuid("Invalid category id"),
+  id: z.string("id must be string").uuid("Invalid category id"),
 });
 
 export const createCategorySchema = z.object({
   name: z.string("Name must be string").min(1, "Name is required"),
-  description: z.string().optional(),
+  description: z.string("Description must be string").optional(),
 });
 
 export const updateCategorySchema = z.object({
   name: z.string("Name must be string").min(1, "Name is required").optional(),
-  description: z.string().optional(),
+  description: z.string("Description must be string").optional(),
 });
 
 export const getCategoriesQuerySchema = z.object({

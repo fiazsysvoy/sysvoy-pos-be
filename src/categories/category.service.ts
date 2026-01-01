@@ -63,21 +63,21 @@ export class CategoryService {
 
     const where: PrismaTypes.CategoryWhereInput | undefined = search
       ? {
-        OR: [
-          {
-            name: {
-              contains: search,
-              mode: PrismaTypes.QueryMode.insensitive,
+          OR: [
+            {
+              name: {
+                contains: search,
+                mode: PrismaTypes.QueryMode.insensitive,
+              },
             },
-          },
-          {
-            description: {
-              contains: search,
-              mode: PrismaTypes.QueryMode.insensitive,
+            {
+              description: {
+                contains: search,
+                mode: PrismaTypes.QueryMode.insensitive,
+              },
             },
-          },
-        ],
-      }
+          ],
+        }
       : undefined;
 
     const [categories, total] = await Promise.all([
@@ -114,7 +114,17 @@ export class CategoryService {
     });
   }
 
-  delete(id: string) {
+  async delete(id: string) {
+    // check category
+    const category = await prismaClient.category.findUnique({
+      where: { id },
+    });
+
+    if (!category) {
+      throw new HttpError("Category not found", 404);
+    }
+
+    // Delete category by id
     return prismaClient.category.delete({
       where: { id },
     });

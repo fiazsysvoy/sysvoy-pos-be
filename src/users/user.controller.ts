@@ -3,6 +3,7 @@ import { UserService } from "./user.service.js";
 import {
   getUsersQuerySchema,
   updateUserSchema,
+  createUserSchema,
   userIdParamSchema,
 } from "./user.schema.js";
 import { HttpError } from "../utils/HttpError.js";
@@ -42,6 +43,25 @@ export const getUserById = async (req: Request, res: Response) => {
   }
 
   res.json(user);
+};
+
+export const createUser = async (req: Request, res: Response) => {
+  try {
+    const parsed = createUserSchema.safeParse(req.body);
+    if (!parsed.success) {
+      // detailed error messages from Zod
+      return res
+        .status(400)
+        .json({ errors: parsed.error.issues.map((issue) => issue.message) });
+    }
+    const { email, password, name, role } = parsed.data;
+
+    // Create user
+    const user = await userService.createUser(email, password, name, role);
+    res.status(201).json({ message: "User created successfully", user });
+  } catch (err: any) {
+    res.status(400).json({ message: err.message });
+  }
 };
 
 // PUT /users/:id

@@ -60,8 +60,8 @@ export class UserService {
     };
   }
 
-  getById(id: string) {
-    return prismaClient.user.findUnique({
+  async getById(id: string) {
+    return await prismaClient.user.findUnique({
       where: { id },
       select: {
         id: true,
@@ -71,6 +71,33 @@ export class UserService {
         createdAt: true,
       },
     });
+  }
+
+  async createUser(
+    email: string,
+    password: string,
+    name?: string,
+    role?: "ADMIN" | "STAFF",
+  ) {
+    const existingUser = await prismaClient.user.findUnique({
+      where: { email },
+    });
+    if (existingUser) throw new Error("User already exists");
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = await prismaClient.user.create({
+      data: {
+        email,
+        password: hashedPassword,
+        name,
+        role: role || "STAFF",
+      },
+    });
+
+    // Remove password before returning
+    const { password: _, ...safeUser } = user;
+    return safeUser;
   }
 
   async update(id: string, data: any) {

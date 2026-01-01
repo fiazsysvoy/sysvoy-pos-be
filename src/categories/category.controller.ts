@@ -98,14 +98,21 @@ export const updateCategory = async (req: Request, res: Response) => {
 
 // DELETE /categories/:id
 export const deleteCategory = async (req: Request, res: Response) => {
-  const parsed = categoryIdParamSchema.safeParse(req.params);
+  try {
+    const parsed = categoryIdParamSchema.safeParse(req.params);
 
-  if (!parsed.success) {
-    return res
-      .status(400)
-      .json({ errors: parsed.error.issues.map((i: any) => i.message) });
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ errors: parsed.error.issues.map((i: any) => i.message) });
+    }
+
+    await categoryService.delete(parsed.data.id);
+    res.status(204).send();
+  } catch (error) {
+    if (error instanceof HttpError) {
+      return res.status(error.statusCode).json({ message: error.message });
+    }
+    return res.status(500).json({ message: "Internal server error" });
   }
-
-  await categoryService.delete(parsed.data.id);
-  res.status(204).send();
 };

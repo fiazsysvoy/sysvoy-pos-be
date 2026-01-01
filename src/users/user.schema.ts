@@ -26,3 +26,12 @@ export const getUsersQuerySchema = z.object({
 
   search: z.string().optional(),
 });
+
+export const createUserSchema = z.object({
+  email: z.string().email({ message: "Invalid email address" }),
+  password: z
+    .string()
+    .min(6, { message: "Password must be at least 6 characters" }),
+  name: z.string().optional(),
+  role: z.enum(["ADMIN", "STAFF"]).optional(),
+});
