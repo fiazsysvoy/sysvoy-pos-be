@@ -1,27 +1,15 @@
 import { prismaClient } from "../../lib/prisma.js";
-import { Prisma as PrismaTypes } from "../../../generated/prisma/client.js";
-import { User } from "../../../generated/prisma/client.js";
 import {
-  createCategorySchema,
-  updateCategorySchema,
-} from "./category.schema.js";
-import { z } from "zod";
+  Prisma,
+  Prisma as PrismaTypes,
+} from "../../../generated/prisma/client.js";
 import { HttpError } from "../../utils/HttpError.js";
-import { uploadImage } from "../../utils/uploadImage.js";
-
-interface GetCategoriesOptions {
-  pageIndex: number;
-  pageSize: number;
-  search?: string;
-}
-type CreateCategoryDTO = z.infer<typeof createCategorySchema>;
-type UpdateCategoryDTO = z.infer<typeof updateCategorySchema>;
-
-interface CreateCategoryParams {
-  user: User;
-  data: CreateCategoryDTO;
-  file?: Express.Multer.File; // pass file buffer here
-}
+import { uploadImage, deleteImage } from "../../utils/uploadImage.js";
+import {
+  CreateCategoryParams,
+  GetCategoriesOptions,
+  UpdateCategoryParams,
+} from "./category.types.js";
 
 export class CategoryService {
   async create({ user, data, file }: CreateCategoryParams) {
@@ -101,17 +89,87 @@ export class CategoryService {
     };
   }
 
-  getById(id: string) {
-    return prismaClient.category.findUnique({
+  async getById(id: string) {
+    return await prismaClient.category.findUnique({
       where: { id },
     });
   }
 
-  update(id: string, data: UpdateCategoryDTO) {
-    return prismaClient.category.update({
+  async update({ id, data, file }: UpdateCategoryParams) {
+    let uploadedImage: { url: string; publicId: string } | null = null;
+
+    // Fetch category
+    const category = await prismaClient.category.findUnique({
       where: { id },
-      data,
     });
+
+    if (!category) {
+      throw new HttpError("Category not found", 404);
+    }
+
+    // Fast duplicate check
+    if (data.name && data.name !== category.name) {
+      const exists = await prismaClient.category.findFirst({
+        where: {
+          name: data.name,
+          NOT: { id },
+        },
+      });
+
+      if (exists) {
+        throw new HttpError("Category name already exists", 409);
+      }
+    }
+
+    // Upload image AFTER validation
+    if (file) {
+      uploadedImage = await uploadImage(file.buffer, "categories");
+    }
+
+    try {
+      const updateData: Prisma.CategoryUpdateInput = {};
+
+      if (data.name && data.name !== category.name) {
+        updateData.name = data.name;
+      }
+      updateData.description = data.description;
+
+      if (file) {
+        updateData.imageUrl = uploadedImage!.url;
+        updateData.imagePublicId = uploadedImage!.publicId;
+      } else if (data.imageUrl === null) {
+        updateData.imageUrl = null;
+        updateData.imagePublicId = null;
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        return category;
+      }
+
+      const updatedCategory = await prismaClient.category.update({
+        where: { id },
+        data: updateData,
+      });
+
+      // Delete old image AFTER DB success
+      if ((file || data.imageUrl === null) && category.imagePublicId) {
+        await deleteImage(category.imagePublicId);
+      }
+
+      return updatedCategory;
+    } catch (e: any) {
+      // Cleanup newly uploaded image if DB failed
+      if (uploadedImage) {
+        await deleteImage(uploadedImage.publicId);
+      }
+
+      // Safety net for race condition
+      if (e.code === "P2002") {
+        throw new HttpError("Category name already exists", 409);
+      }
+
+      throw e;
+    }
   }
 
   async delete(id: string) {
@@ -125,7 +183,7 @@ export class CategoryService {
     }
 
     // Delete category by id
-    return prismaClient.category.delete({
+    return await prismaClient.category.delete({
       where: { id },
     });
   }

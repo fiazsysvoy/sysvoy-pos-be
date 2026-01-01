@@ -27,7 +27,12 @@ router.get("/", getCategories);
 router.get("/:id", getCategoryById);
 
 // Update category (admin only)
-router.put("/:id", requireAdmin, updateCategory);
+router.patch(
+  "/:id",
+  requireAdmin,
+  safeUpload(upload.single("image")),
+  updateCategory,
+);
 
 // Delete category (admin only)
 router.delete("/:id", requireAdmin, deleteCategory);

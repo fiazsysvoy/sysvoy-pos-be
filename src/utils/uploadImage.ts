@@ -22,3 +22,15 @@ export async function uploadImage(buffer: Buffer, folder = "products") {
       .end(buffer);
   });
 }
+
+export async function deleteImage(publicId: string) {
+  return new Promise<void>((resolve, reject) => {
+    cloudinary.uploader.destroy(publicId, (error, result) => {
+      if (error) {
+        return reject(error);
+      }
+      console.log(`Deleted image with publicID: ${publicId}`);
+      resolve();
+    });
+  });
+}

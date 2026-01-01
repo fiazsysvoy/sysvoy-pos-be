@@ -19,7 +19,11 @@ export const createProduct = async (req: Request, res: Response) => {
       .json({ errors: parsed.error.issues.map((i) => i.message) });
   }
 
-  const product = await productService.create(req.user!, parsed.data);
+  const product = await productService.create({
+    user: req.user!,
+    data: parsed.data,
+    files: req.files as Express.Multer.File[],
+  });
   res.status(201).json(product);
 };
 
@@ -75,10 +79,11 @@ export const updateProduct = async (req: Request, res: Response) => {
     });
   }
 
-  const product = await productService.update(
-    paramsParsed.data.id,
-    bodyParsed.data,
-  );
+  const product = await productService.update({
+    id: paramsParsed.data.id,
+    data: bodyParsed.data,
+    files: req.files as Express.Multer.File[],
+  });
   res.json({ message: "Product updated", product });
 };
 

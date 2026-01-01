@@ -7,6 +7,7 @@ import {
   categoryIdParamSchema,
 } from "./category.schema.js";
 import { HttpError } from "../../utils/HttpError.js";
+import { asyncHandler } from "../../utils/asyncHandler.js";
 
 const categoryService = new CategoryService();
 
@@ -75,7 +76,7 @@ export const getCategoryById = async (req: Request, res: Response) => {
 };
 
 // PUT /categories/:id
-export const updateCategory = async (req: Request, res: Response) => {
+export const updateCategory = asyncHandler(async (req, res) => {
   const paramsParsed = categoryIdParamSchema.safeParse(req.params);
   const bodyParsed = updateCategorySchema.safeParse(req.body);
 
@@ -89,12 +90,13 @@ export const updateCategory = async (req: Request, res: Response) => {
     });
   }
 
-  const category = await categoryService.update(
-    paramsParsed.data.id,
-    bodyParsed.data,
-  );
+  const category = await categoryService.update({
+    id: paramsParsed.data.id,
+    data: bodyParsed.data,
+    file: req.file,
+  });
   res.json({ message: "Category updated", category });
-};
+});
 
 // DELETE /categories/:id
 export const deleteCategory = async (req: Request, res: Response) => {

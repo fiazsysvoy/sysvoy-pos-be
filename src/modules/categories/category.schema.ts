@@ -10,8 +10,16 @@ export const createCategorySchema = z.object({
 });
 
 export const updateCategorySchema = z.object({
-  name: z.string("Name must be string").min(1, "Name is required").optional(),
-  description: z.string("Description must be string").optional(),
+  name: z.string().min(1, "Name is required").optional(),
+  description: z.string().optional(),
+
+  imageUrl: z
+    .string()
+    .url("Invalid image URL")
+    .or(z.literal(""))
+    .nullable()
+    .optional()
+    .transform((val) => (val === "" ? null : val)),
 });
 
 export const getCategoriesQuerySchema = z.object({
