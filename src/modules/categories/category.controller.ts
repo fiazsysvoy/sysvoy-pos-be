@@ -6,39 +6,30 @@ import {
   updateCategorySchema,
   categoryIdParamSchema,
 } from "./category.schema.js";
-import { HttpError } from "../../utils/HttpError.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 
 const categoryService = new CategoryService();
 
 // POST /categories
-export const createCategory = async (req: Request, res: Response) => {
-  try {
-    const parsed = createCategorySchema.safeParse(req.body);
-    if (!parsed.success) {
-      return res
-        .status(400)
-        .json({ errors: parsed.error.issues.map((i: any) => i.message) });
-    }
-
-    const category = await categoryService.create({
-      user: req.user!,
-      data: parsed.data,
-      file: req.file, // pass multer file directly
-    });
-
-    res.status(201).json(category);
-  } catch (error) {
-    if (error instanceof HttpError) {
-      return res.status(error.statusCode).json({ message: error.message });
-    }
-
-    return res.status(500).json({ message: "Internal server error" });
+export const createCategory = asyncHandler(async (req, res) => {
+  const parsed = createCategorySchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res
+      .status(400)
+      .json({ errors: parsed.error.issues.map((i: any) => i.message) });
   }
-};
+
+  const category = await categoryService.create({
+    user: req.user!,
+    data: parsed.data,
+    file: req.file, // pass multer file directly
+  });
+
+  res.status(201).json(category);
+});
 
 // GET /categories
-export const getCategories = async (req: Request, res: Response) => {
+export const getCategories = asyncHandler(async (req, res) => {
   const parsed = getCategoriesQuerySchema.safeParse(req.query);
 
   if (!parsed.success) {
@@ -55,10 +46,10 @@ export const getCategories = async (req: Request, res: Response) => {
     search,
   });
   res.json(result);
-};
+});
 
 // GET /categories/:id
-export const getCategoryById = async (req: Request, res: Response) => {
+export const getCategoryById = asyncHandler(async (req, res) => {
   const parsed = categoryIdParamSchema.safeParse(req.params);
 
   if (!parsed.success) {
@@ -73,7 +64,7 @@ export const getCategoryById = async (req: Request, res: Response) => {
   }
 
   res.json(category);
-};
+});
 
 // PUT /categories/:id
 export const updateCategory = asyncHandler(async (req, res) => {
@@ -99,22 +90,15 @@ export const updateCategory = asyncHandler(async (req, res) => {
 });
 
 // DELETE /categories/:id
-export const deleteCategory = async (req: Request, res: Response) => {
-  try {
-    const parsed = categoryIdParamSchema.safeParse(req.params);
+export const deleteCategory = asyncHandler(async (req, res) => {
+  const parsed = categoryIdParamSchema.safeParse(req.params);
 
-    if (!parsed.success) {
-      return res
-        .status(400)
-        .json({ errors: parsed.error.issues.map((i: any) => i.message) });
-    }
-
-    await categoryService.delete(parsed.data.id);
-    res.status(204).send();
-  } catch (error) {
-    if (error instanceof HttpError) {
-      return res.status(error.statusCode).json({ message: error.message });
-    }
-    return res.status(500).json({ message: "Internal server error" });
+  if (!parsed.success) {
+    return res
+      .status(400)
+      .json({ errors: parsed.error.issues.map((i: any) => i.message) });
   }
-};
+
+  await categoryService.delete(parsed.data.id);
+  res.status(204).send();
+});

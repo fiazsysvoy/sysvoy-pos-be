@@ -1,10 +1,10 @@
-import { Request, Response } from "express";
 import { AuthService } from "./auth.service.js";
 import { signinSchema, signupSchema } from "./auth.schema.js";
+import { asyncHandler } from "../../utils/asyncHandler.js";
 
 const authService = new AuthService();
 
-export const signup = async (req: Request, res: Response) => {
+export const signup = asyncHandler(async (req, res) => {
   try {
     // Validate input
     const parsed = signupSchema.safeParse(req.body);
@@ -23,9 +23,9 @@ export const signup = async (req: Request, res: Response) => {
   } catch (err: any) {
     res.status(400).json({ message: err.message });
   }
-};
+});
 
-export const signin = async (req: Request, res: Response) => {
+export const signin = asyncHandler(async (req, res) => {
   try {
     const parsed = signinSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -41,4 +41,4 @@ export const signin = async (req: Request, res: Response) => {
   } catch (err: any) {
     res.status(401).json({ message: err.message });
   }
-};
+});
