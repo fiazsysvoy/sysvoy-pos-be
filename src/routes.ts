@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { requireAdmin } from "./middlewares/auth.middleware.js";
-import authRouter from "./routes/auth.route.js";
-import categoryRoutes from "./routes/category.route.js";
-import userRouter from "./routes/user.route.js";
-import productRouter from "./routes/product.route.js";
+import authRouter from "./modules/auth/auth.routes.js";
+import categoryRoutes from "./modules/categories/category.routes.js";
+import userRouter from "./modules/users/user.routes.js";
+import productRouter from "./modules/product/product.routes.js";
 
 const router = Router();
 

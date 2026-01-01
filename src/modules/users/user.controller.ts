@@ -6,7 +6,7 @@ import {
   createUserSchema,
   userIdParamSchema,
 } from "./user.schema.js";
-import { HttpError } from "../utils/HttpError.js";
+import { HttpError } from "../../utils/HttpError.js";
 
 const userService = new UserService();
 

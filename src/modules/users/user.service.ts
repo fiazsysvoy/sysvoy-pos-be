@@ -1,7 +1,7 @@
 import bcrypt from "bcrypt";
-import { prismaClient } from "../lib/prisma.js";
-import { Prisma as PrismaTypes } from "../../generated/prisma/client.js"; // for types
-import { HttpError } from "../utils/HttpError.js";
+import { prismaClient } from "../../lib/prisma.js";
+import { Prisma as PrismaTypes } from "../../../generated/prisma/client.js"; // for types
+import { HttpError } from "../../utils/HttpError.js";
 
 interface GetUsersOptions {
   pageIndex: number;

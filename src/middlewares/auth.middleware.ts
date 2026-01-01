@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { verifyJwt, JwtPayload } from "../auth/jwt.util.js";
+import { verifyJwt } from "../modules/auth/jwt.utils.js";
 import { prismaClient } from "../lib/prisma.js";
 import { User } from "../../generated/prisma/client.js";
 

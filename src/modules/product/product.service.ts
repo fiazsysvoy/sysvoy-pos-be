@@ -1,6 +1,6 @@
-import { prismaClient } from "../lib/prisma.js";
-import { Prisma as PrismaTypes } from "../../generated/prisma/client.js";
-import { User } from "../../generated/prisma/client.js";
+import { prismaClient } from "../../lib/prisma.js";
+import { Prisma as PrismaTypes } from "../../../generated/prisma/client.js";
+import { User } from "../../../generated/prisma/client.js";
 import { createProductSchema, updateProductSchema } from "./product.schema.js";
 import { z } from "zod";
 

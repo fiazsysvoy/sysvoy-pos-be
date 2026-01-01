@@ -1,13 +1,13 @@
-import { prismaClient } from "../lib/prisma.js";
-import { Prisma as PrismaTypes } from "../../generated/prisma/client.js";
-import { User } from "../../generated/prisma/client.js";
+import { prismaClient } from "../../lib/prisma.js";
+import { Prisma as PrismaTypes } from "../../../generated/prisma/client.js";
+import { User } from "../../../generated/prisma/client.js";
 import {
   createCategorySchema,
   updateCategorySchema,
 } from "./category.schema.js";
 import { z } from "zod";
-import { HttpError } from "../utils/HttpError.js";
-import { uploadImage } from "../utils/uploadImage.js";
+import { HttpError } from "../../utils/HttpError.js";
+import { uploadImage } from "../../utils/uploadImage.js";
 
 interface GetCategoriesOptions {
   pageIndex: number;
@@ -26,7 +26,7 @@ interface CreateCategoryParams {
 export class CategoryService {
   async create({ user, data, file }: CreateCategoryParams) {
     return prismaClient.$transaction(async (tx) => {
-      // 1️⃣ Check if category exists
+      // Check if category exists
       const existing = await tx.category.findUnique({
         where: { name: data.name },
       });
@@ -35,7 +35,7 @@ export class CategoryService {
         throw new HttpError("Category with this name already exists", 400);
       }
 
-      // 2️⃣ Upload image if provided
+      // Upload image if provided
       let imageUrl: string | null = null;
       let imagePublicId: string | null = null;
 

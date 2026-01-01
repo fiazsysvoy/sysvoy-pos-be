@@ -6,7 +6,7 @@ import {
   updateCategorySchema,
   categoryIdParamSchema,
 } from "./category.schema.js";
-import { HttpError } from "../utils/HttpError.js";
+import { HttpError } from "../../utils/HttpError.js";
 
 const categoryService = new CategoryService();
 
