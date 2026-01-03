@@ -1,0 +1,94 @@
+import { Request, Response } from "express";
+import { OrderService } from "./order.service.js";
+import {
+  createOrderSchema,
+  returnOrderSchema,
+  orderIdParamSchema,
+  getOrdersQuerySchema,
+} from "./order.schema.js";
+import { asyncHandler } from "../../utils/asyncHandler.js";
+
+const orderService = new OrderService();
+
+export const createOrder = asyncHandler(async (req: Request, res: Response) => {
+  const parsed = createOrderSchema.safeParse(req.body);
+
+  if (!parsed.success) {
+    return res
+      .status(400)
+      .json({ errors: parsed.error.issues.map((i) => i.message) });
+  }
+
+  const order = await orderService.create(req.user!, parsed.data);
+
+  res.status(201).json({
+    success: true,
+    message: "Order created successfully",
+    data: order,
+  });
+});
+
+export const getAllOrders = asyncHandler(
+  async (req: Request, res: Response) => {
+    const parsed = getOrdersQuerySchema.safeParse(req.query);
+
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ errors: parsed.error.issues.map((i) => i.message) });
+    }
+
+    const result = await orderService.getAll(parsed.data);
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  },
+);
+
+export const getOrderById = asyncHandler(
+  async (req: Request, res: Response) => {
+    const parsed = orderIdParamSchema.safeParse(req.params);
+
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ errors: parsed.error.issues.map((i) => i.message) });
+    }
+
+    const order = await orderService.getById(parsed.data.id);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: order,
+    });
+  },
+);
+
+export const returnOrderItems = asyncHandler(
+  async (req: Request, res: Response) => {
+    const parsed = returnOrderSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ errors: parsed.error.issues.map((i) => i.message) });
+    }
+
+    const returnRecord = await orderService.returnItems(req.user!, parsed.data);
+
+    res.status(201).json({
+      success: true,
+      message: "Items returned successfully",
+      data: returnRecord,
+    });
+  },
+);

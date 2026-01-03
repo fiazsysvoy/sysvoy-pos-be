@@ -21,26 +21,28 @@ enum Role {
 
 // User model
 model User {
-  id         String     @id @default(uuid())
-  email      String     @unique
-  password   String
-  name       String?
-  role       Role       @default(STAFF)
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String?
+  role      Role     @default(STAFF)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   categories Category[] @relation("UserCategories")
   products   Product[]  @relation("UserProducts")
+  orders     Order[]
+  returns    Return[]
 }
 
 model Category {
-  id          String    @id @default(uuid())
-  name        String    @unique
-  description String?
-  imageUrl      String?    // Cloudinary URL
-  imagePublicId String?    // Cloudinary public ID
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id            String   @id @default(uuid())
+  name          String   @unique
+  description   String?
+  imageUrl      String? // Cloudinary URL
+  imagePublicId String? // Cloudinary public ID
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   products    Product[]
   createdBy   User?     @relation("UserCategories", fields: [createdById], references: [id])
@@ -48,25 +50,87 @@ model Category {
 }
 
 model Product {
-  id          String    @id @default(uuid())
+  id          String   @id @default(uuid())
   name        String
   description String?
   price       Float
-  stock       Int       @default(0)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  stock       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  images      Json? // Array of Cloudinary URLs and public IDs
+  images Json? // Array of Cloudinary URLs and public IDs
 
-  category    Category  @relation(fields: [categoryId], references: [id])
-  categoryId  String
+  category   Category @relation(fields: [categoryId], references: [id])
+  categoryId String
 
-  createdBy   User?     @relation("UserProducts", fields: [createdById], references: [id])
+  createdBy   User?       @relation("UserProducts", fields: [createdById], references: [id])
   createdById String?
-  
+  orderItems  OrderItem[]
+
   // Index for name
   @@index([name])
-  
   // Index for categoryId
   @@index([categoryId])
+}
+
+model Order {
+  id          String   @id @default(uuid())
+  totalAmount Float
+  createdAt   DateTime @default(now())
+
+  items OrderItem[]
+
+  createdBy   User?   @relation(fields: [createdById], references: [id])
+  createdById String?
+
+  returns Return[]
+
+  @@index([createdAt])
+  @@index([createdById])
+}
+
+model OrderItem {
+  id String @id @default(uuid())
+
+  order   Order  @relation(fields: [orderId], references: [id])
+  orderId String
+
+  product   Product @relation(fields: [productId], references: [id])
+  productId String
+
+  quantity Int
+  price    Float // price at sale time
+
+  returns ReturnItem[]
+
+  @@unique([orderId, productId])
+}
+
+model Return {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  order   Order  @relation(fields: [orderId], references: [id])
+  orderId String
+
+  items ReturnItem[]
+
+  refundedAmount Float
+
+  createdBy   User?   @relation(fields: [createdById], references: [id])
+  createdById String?
+
+  @@index([orderId])
+}
+
+model ReturnItem {
+  id String @id @default(uuid())
+
+  return   Return @relation(fields: [returnId], references: [id])
+  returnId String
+
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id])
+  orderItemId String
+
+  quantity Int
 }
