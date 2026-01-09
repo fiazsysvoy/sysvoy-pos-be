@@ -68,15 +68,25 @@ export class CategoryService {
         }
       : undefined;
 
-    const [categories, total] = await Promise.all([
+    const [rawCategories, total] = await Promise.all([
       prismaClient.category.findMany({
         where,
         skip,
         take: pageSize,
         orderBy: { createdAt: "desc" },
+        include: {
+          _count: {
+            select: { products: true },
+          },
+        },
       }),
       prismaClient.category.count({ where }),
     ]);
+
+    const categories = rawCategories.map(({ _count, ...cat }) => ({
+      ...cat,
+      itemsCount: _count.products,
+    }));
 
     return {
       meta: {
