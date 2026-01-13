@@ -60,7 +60,7 @@ model Product {
 
   images Json? // Array of Cloudinary URLs and public IDs
 
-  category   Category @relation(fields: [categoryId], references: [id])
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   categoryId String
 
   createdBy   User?       @relation("UserProducts", fields: [createdById], references: [id])

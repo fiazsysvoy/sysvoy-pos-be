@@ -22,3 +22,8 @@ export interface UpdateProductParams {
   data: UpdateProductDTO;
   files?: Express.Multer.File[]; // Support multiple files
 }
+
+export type ProductImage = {
+  url: string;
+  publicId: string;
+};

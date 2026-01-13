@@ -10,6 +10,7 @@ import {
   GetCategoriesOptions,
   UpdateCategoryParams,
 } from "./category.types.js";
+import { ProductImage } from "../product/product.types.js";
 
 export class CategoryService {
   async create({ user, data, file }: CreateCategoryParams) {
@@ -186,10 +187,30 @@ export class CategoryService {
     // check category
     const category = await prismaClient.category.findUnique({
       where: { id },
+      include: {
+        products: { select: { id: true , images: true } },
+      },
     });
 
     if (!category) {
       throw new HttpError("Category not found", 404);
+    }
+
+    // Delete image if exists
+    if (category.imagePublicId) {
+      await deleteImage(category.imagePublicId);
+    }
+
+    // delete images of products in this category
+    const products = await prismaClient.product.findMany({
+      where: { categoryId: id },
+      select: { images: true },
+    });
+    for (const product of products) {
+      const images = (product.images as ProductImage[]) || [];
+      for (const image of images) {
+        await deleteImage(image.publicId);
+      }
     }
 
     // Delete category by id
