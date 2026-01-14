@@ -12,10 +12,24 @@ import {
   GetProductsOptions,
   UpdateProductParams,
 } from "./product.types.js";
+import { HttpError } from "../../utils/HttpError.js";
 
 export class ProductService {
   async create({ user, data, files }: CreateProductParams) {
     let uploadedImages: { url: string; publicId: string }[] = [];
+
+    const organizationId = user.organizationId;
+    if (!organizationId) {
+      throw new HttpError("User does not belong to any organization", 400);
+    }
+    const { categoryId, ...rest } = data;
+    const category = await prismaClient.category.findUnique({
+      where: { id: categoryId, organizationId },
+    });
+
+    if (!category) {
+      throw new HttpError("Category not found", 404);
+    }
 
     // Handle multiple file uploads
     if (files && files.length > 0) {
@@ -26,16 +40,14 @@ export class ProductService {
     }
 
     try {
-      const { categoryId, ...rest } = data;
-
       return prismaClient.product.create({
         data: {
           ...rest,
           category: {
             connect: { id: categoryId },
           },
-          createdBy: {
-            connect: { id: user.id },
+          organization: {
+            connect: { id: organizationId },
           },
           ...(uploadedImages.length > 0 && {
             images: uploadedImages,
@@ -51,27 +63,28 @@ export class ProductService {
     }
   }
 
-  async getAll({ pageIndex, pageSize, search }: GetProductsOptions) {
+  async getAll({ pageIndex, pageSize, search, user }: GetProductsOptions) {
     const skip = pageIndex * pageSize;
 
-    const where: PrismaTypes.ProductWhereInput | undefined = search
-      ? {
-          OR: [
-            {
-              name: {
-                contains: search,
-                mode: PrismaTypes.QueryMode.insensitive,
-              },
+    const where: PrismaTypes.ProductWhereInput | undefined = {
+      organizationId: user.organizationId!,
+      ...(search && {
+        OR: [
+          {
+            name: {
+              contains: search,
+              mode: PrismaTypes.QueryMode.insensitive,
             },
-            {
-              description: {
-                contains: search,
-                mode: PrismaTypes.QueryMode.insensitive,
-              },
+          },
+          {
+            description: {
+              contains: search,
+              mode: PrismaTypes.QueryMode.insensitive,
             },
-          ],
-        }
-      : undefined;
+          },
+        ],
+      }),
+    };
 
     const [products, total] = await Promise.all([
       prismaClient.product.findMany({
@@ -95,23 +108,31 @@ export class ProductService {
     };
   }
 
-  getById(id: string) {
+  getById(id: string, user: User) {
+    const organizationId = user.organizationId;
+    if (!organizationId) {
+      throw new HttpError("User does not belong to any organization", 400);
+    }
     return prismaClient.product.findUnique({
-      where: { id },
+      where: { id, organizationId },
       include: { category: true },
     });
   }
 
-  async update({ id, data, files }: UpdateProductParams) {
+  async update({ id, data, files, user }: UpdateProductParams) {
     let uploadedImages: { url: string; publicId: string }[] = [];
+    const organizationId = user.organizationId;
+    if (!organizationId) {
+      throw new HttpError("User does not belong to any organization", 400);
+    }
 
     // Fetch product
     const product = await prismaClient.product.findUnique({
-      where: { id },
+      where: { id, organizationId }, // Ensure product belongs to user's organization
     });
 
     if (!product) {
-      throw new Error("Product not found");
+      throw new HttpError("Product not found", 404);
     }
 
     // Handle multiple file uploads
@@ -181,7 +202,19 @@ export class ProductService {
     }
   }
 
-  delete(id: string) {
+  delete(id: string, user: User) {
+    const organizationId = user.organizationId;
+    if (!organizationId) {
+      throw new HttpError("User does not belong to any organization", 400);
+    }
+
+    const product = prismaClient.product.findUnique({
+      where: { id, organizationId },
+    });
+    if (!product) {
+      throw new HttpError("Product not found", 404);
+    }
+
     return prismaClient.product.delete({
       where: { id },
     });

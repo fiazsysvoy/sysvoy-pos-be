@@ -6,3 +6,30 @@ export const signupSchema = z.object({
 });
 
 export const signinSchema = signupSchema.extend({});
+
+export const verifyEmailSchema = z.object({
+  email: z.string().email(),
+  code: z.string().min(1, "Verification code is required"),
+});
+
+export const resendVerificationSchema = z.object({
+  email: z.string().email(),
+});
+
+export const createOrganizationSchema = z.object({
+  name: z.string().min(2, "Organization name must be at least 2 characters"),
+});
+
+export const changePasswordSchema = z.object({
+  oldPassword: z.string().min(1, "Old password is required"),
+  newPassword: z.string().min(6, "New password must be at least 6 characters"),
+});
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().email(),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1, "Reset token is required"),
+  newPassword: z.string().min(6, "New password must be at least 6 characters"),
+});

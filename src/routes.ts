@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { requireAdmin } from "./middlewares/auth.middleware.js";
+import { requireAuth } from "./middlewares/auth.middleware.js";
 import authRouter from "./modules/auth/auth.routes.js";
 import categoryRoutes from "./modules/categories/category.routes.js";
 import userRouter from "./modules/users/user.routes.js";
@@ -12,15 +12,15 @@ const router = Router();
 router.use("/auth", authRouter);
 
 // Category routes
-router.use("/categories", categoryRoutes);
+router.use("/categories", requireAuth, categoryRoutes);
 
 // User routes
-router.use("/users", requireAdmin, userRouter);
+router.use("/users", requireAuth, userRouter);
 
 // Product routes
-router.use("/products", productRouter);
+router.use("/products", requireAuth, productRouter);
 
 // order routes
-router.use("/orders", requireAdmin, orderRouter);
+router.use("/orders", requireAuth, orderRouter);
 
 export default router;

@@ -1,36 +1,45 @@
 import bcrypt from "bcrypt";
 import { prismaClient } from "../../lib/prisma.js";
-import { Prisma as PrismaTypes } from "../../../generated/prisma/client.js"; // for types
+import {
+  Prisma as PrismaTypes,
+  User,
+} from "../../../generated/prisma/client.js"; // for types
 import { HttpError } from "../../utils/HttpError.js";
 
 interface GetUsersOptions {
   pageIndex: number;
+  user: User;
   pageSize: number;
   search?: string;
 }
 
 export class UserService {
-  async getAll({ pageIndex, pageSize, search }: GetUsersOptions) {
+  async getAll({ pageIndex, pageSize, search, user }: GetUsersOptions) {
     const skip = pageIndex * pageSize; // 0-based pageIndex
+    const organizationId = user.organizationId;
+    if (!organizationId) {
+      throw new HttpError("User does not belong to any organization", 400);
+    }
 
-    const where: PrismaTypes.UserWhereInput | undefined = search
-      ? {
-          OR: [
-            {
-              email: {
-                contains: search,
-                mode: PrismaTypes.QueryMode.insensitive,
-              },
+    const where: PrismaTypes.UserWhereInput | undefined = {
+      organizationId,
+      ...(search && {
+        OR: [
+          {
+            email: {
+              contains: search,
+              mode: PrismaTypes.QueryMode.insensitive,
             },
-            {
-              name: {
-                contains: search,
-                mode: PrismaTypes.QueryMode.insensitive,
-              },
+          },
+          {
+            name: {
+              contains: search,
+              mode: PrismaTypes.QueryMode.insensitive,
             },
-          ],
-        }
-      : undefined;
+          },
+        ],
+      }),
+    };
 
     const [users, total] = await Promise.all([
       prismaClient.user.findMany({
@@ -60,9 +69,13 @@ export class UserService {
     };
   }
 
-  async getById(id: string) {
+  async getById(id: string, user?: User) {
+    const organizationId = user?.organizationId;
+    if (!organizationId) {
+      throw new HttpError("User does not belong to any organization", 400);
+    }
     return await prismaClient.user.findUnique({
-      where: { id },
+      where: { id, organizationId },
       select: {
         id: true,
         email: true,
@@ -74,6 +87,7 @@ export class UserService {
   }
 
   async createUser(
+    user: User,
     email: string,
     password: string,
     name?: string,
@@ -82,27 +96,38 @@ export class UserService {
     const existingUser = await prismaClient.user.findUnique({
       where: { email },
     });
-    if (existingUser) throw new Error("User already exists");
+    if (existingUser) throw new HttpError("User already exists", 409);
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = await prismaClient.user.create({
+    const newUser = await prismaClient.user.create({
       data: {
         email,
         password: hashedPassword,
         name,
         role: role || "STAFF",
+        organizationId: user.organizationId!,
+        status: "ACTIVE",
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
       },
     });
 
-    // Remove password before returning
-    const { password: _, ...safeUser } = user;
-    return safeUser;
+    return newUser;
   }
 
-  async update(id: string, data: any) {
+  async update(id: string, data: any, user: User) {
+    const organizationId = user.organizationId;
+    if (!organizationId) {
+      throw new HttpError("User does not belong to any organization", 400);
+    }
+
     const existingUser = await prismaClient.user.findUnique({
-      where: { id },
+      where: { id, organizationId },
     });
 
     if (!existingUser) {
@@ -143,13 +168,15 @@ export class UserService {
     });
   }
 
-  async delete(id: string) {
+  async delete(id: string, user: User) {
     // check if user exists
-    const existingUser = await this.getById(id);
+    const existingUser = await this.getById(id, user);
     if (!existingUser) {
       throw new HttpError("User not found", 404);
     }
 
-    await prismaClient.user.delete({ where: { id } });
+    await prismaClient.user.delete({
+      where: { id, organizationId: user.organizationId },
+    });
   }
 }

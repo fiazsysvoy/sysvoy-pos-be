@@ -16,37 +16,78 @@ datasource db {
 // Define enum for roles
 enum Role {
   ADMIN
+  OWNER
   STAFF
+}
+
+enum AccountStatus{
+  UNVERIFIED_EMAIL
+  ORG_UNATTACHED
+  ACTIVE
+  VERIFIED_EMAIL
 }
 
 // User model
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String?
-  role      Role     @default(STAFF)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String        @id @default(uuid())
+  email          String        @unique
+  password       String
+  name           String?
+  role           Role          @default(STAFF)
+  status           AccountStatus          @default(UNVERIFIED_EMAIL)
 
-  categories Category[] @relation("UserCategories")
-  products   Product[]  @relation("UserProducts")
-  orders     Order[]
-  returns    Return[]
+  organization   Organization?  @relation("OrganizationUsers", fields: [organizationId], references: [id])
+  organizationId String?
+
+  orders Order[] @relation("UserOrders")
+  returns Return[] @relation("UserReturns")
+  createdOrganizations Organization[] @relation("OrganizationCreator")
+
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime?
+
+  verificationCode String?
+  verificationCodeExpiresAt DateTime?
+
+  passwordResetToken String?
+  passwordResetExpiresAt DateTime?
+}
+
+model Organization {
+  id          String   @id @default(uuid())
+  name        String
+
+  createdById String?
+  createdBy   User?    @relation("OrganizationCreator", fields: [createdById], references: [id])
+
+  users       User[]   @relation("OrganizationUsers")
+  categories  Category[]
+  products    Product[]
+  orders      Order[]
+  returns     Return[]
+  orderItems OrderItem[] @relation("OrgOrderItems")
+  returnItems ReturnItem[] @relation("OrgReturnItems")
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
 }
 
 model Category {
   id            String   @id @default(uuid())
-  name          String   @unique
+  name          String
   description   String?
   imageUrl      String? // Cloudinary URL
   imagePublicId String? // Cloudinary public ID
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  products    Product[]
-  createdBy   User?     @relation("UserCategories", fields: [createdById], references: [id])
-  createdById String?
+  products      Product[]
+  organization   Organization  @relation(fields: [organizationId], references: [id])
+  organizationId String
+
+  @@unique([name, organizationId])
 }
 
 model Product {
@@ -63,14 +104,15 @@ model Product {
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   categoryId String
 
-  createdBy   User?       @relation("UserProducts", fields: [createdById], references: [id])
-  createdById String?
+  organization   Organization  @relation(fields: [organizationId], references: [id])
+  organizationId String
+
   orderItems  OrderItem[]
 
-  // Index for name
-  @@index([name])
-  // Index for categoryId
-  @@index([categoryId])
+  @@index([organizationId, name])
+  @@index([categoryId, organizationId])
+  
+  @@unique([id, organizationId])
 }
 
 model Order {
@@ -80,23 +122,31 @@ model Order {
 
   items OrderItem[]
 
-  createdBy   User?   @relation(fields: [createdById], references: [id])
+  createdBy   User? @relation("UserOrders", fields: [createdById], references: [id])
   createdById String?
 
   returns Return[]
 
+  organization   Organization  @relation(fields: [organizationId], references: [id])
+  organizationId String
+
   @@index([createdAt])
   @@index([createdById])
+  @@index([organizationId])
+  @@unique([id, organizationId])
 }
 
 model OrderItem {
   id String @id @default(uuid())
 
-  order   Order  @relation(fields: [orderId], references: [id])
+  order   Order  @relation(fields: [orderId, organizationId], references: [id, organizationId])
   orderId String
 
-  product   Product @relation(fields: [productId], references: [id])
+  product   Product @relation(fields: [productId, organizationId], references: [id, organizationId])
   productId String
+
+  organization   Organization @relation("OrgOrderItems", fields: [organizationId], references: [id])
+  organizationId String
 
   quantity Int
   price    Float // price at sale time
@@ -104,23 +154,29 @@ model OrderItem {
   returns ReturnItem[]
 
   @@unique([orderId, productId])
+  @@index([orderId])
+  @@index([productId])
 }
 
 model Return {
   id        String   @id @default(uuid())
   createdAt DateTime @default(now())
 
-  order   Order  @relation(fields: [orderId], references: [id])
+  order Order @relation( fields: [orderId, organizationId], references: [id, organizationId])
   orderId String
 
   items ReturnItem[]
 
   refundedAmount Float
 
-  createdBy   User?   @relation(fields: [createdById], references: [id])
+  createdBy   User? @relation("UserReturns", fields: [createdById], references: [id])
   createdById String?
 
+  organization   Organization  @relation(fields: [organizationId], references: [id])
+  organizationId String
+
   @@index([orderId])
+  @@index([organizationId])
 }
 
 model ReturnItem {
@@ -129,8 +185,14 @@ model ReturnItem {
   return   Return @relation(fields: [returnId], references: [id])
   returnId String
 
+  organization   Organization @relation("OrgReturnItems", fields: [organizationId], references: [id])
+  organizationId String
+
   orderItem   OrderItem @relation(fields: [orderItemId], references: [id])
   orderItemId String
 
   quantity Int
+
+  @@index([returnId])
+  @@index([orderItemId])
 }

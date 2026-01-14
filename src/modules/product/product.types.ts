@@ -6,6 +6,7 @@ export interface GetProductsOptions {
   pageIndex: number;
   pageSize: number;
   search?: string;
+  user: User;
 }
 
 export type CreateProductDTO = z.infer<typeof createProductSchema>;
@@ -18,6 +19,7 @@ export interface CreateProductParams {
 }
 
 export interface UpdateProductParams {
+  user: User;
   id: string;
   data: UpdateProductDTO;
   files?: Express.Multer.File[]; // Support multiple files

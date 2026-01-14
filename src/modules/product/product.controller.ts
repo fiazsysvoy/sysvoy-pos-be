@@ -41,6 +41,7 @@ export const getProducts = asyncHandler(async (req, res) => {
   const { pageIndex, pageSize, search } = parsed.data;
 
   const result = await productService.getAll({
+    user: req.user!,
     pageIndex,
     pageSize,
     search,
@@ -59,7 +60,7 @@ export const getProductById = asyncHandler(
         .json({ errors: parsed.error.issues.map((i: any) => i.message) });
     }
 
-    const product = await productService.getById(parsed.data.id);
+    const product = await productService.getById(parsed.data.id, req.user!);
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
     }
@@ -84,6 +85,7 @@ export const updateProduct = asyncHandler(
     }
 
     const product = await productService.update({
+      user: req.user!,
       id: paramsParsed.data.id,
       data: bodyParsed.data,
       files: req.files as Express.Multer.File[],
@@ -103,7 +105,7 @@ export const deleteProduct = asyncHandler(
         .json({ errors: parsed.error.issues.map((i: any) => i.message) });
     }
 
-    await productService.delete(parsed.data.id);
+    await productService.delete(parsed.data.id, req.user!);
     res.status(204).send();
   },
 );

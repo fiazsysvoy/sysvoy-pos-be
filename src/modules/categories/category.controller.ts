@@ -41,6 +41,7 @@ export const getCategories = asyncHandler(async (req, res) => {
   const { pageIndex, pageSize, search } = parsed.data;
 
   const result = await categoryService.getAll({
+    user: req.user!,
     pageIndex,
     pageSize,
     search,
@@ -51,6 +52,7 @@ export const getCategories = asyncHandler(async (req, res) => {
 // GET /categories/:id
 export const getCategoryById = asyncHandler(async (req, res) => {
   const parsed = categoryIdParamSchema.safeParse(req.params);
+  const user = req.user!;
 
   if (!parsed.success) {
     return res
@@ -58,7 +60,7 @@ export const getCategoryById = asyncHandler(async (req, res) => {
       .json({ errors: parsed.error.issues.map((i: any) => i.message) });
   }
 
-  const category = await categoryService.getById(parsed.data.id);
+  const category = await categoryService.getById(user, parsed.data.id);
   if (!category) {
     return res.status(404).json({ message: "Category not found" });
   }
@@ -82,6 +84,7 @@ export const updateCategory = asyncHandler(async (req, res) => {
   }
 
   const category = await categoryService.update({
+    user: req.user!,
     id: paramsParsed.data.id,
     data: bodyParsed.data,
     file: req.file,
@@ -99,6 +102,6 @@ export const deleteCategory = asyncHandler(async (req, res) => {
       .json({ errors: parsed.error.issues.map((i: any) => i.message) });
   }
 
-  await categoryService.delete(parsed.data.id);
+  await categoryService.delete(req.user!, parsed.data.id);
   res.status(204).send();
 });

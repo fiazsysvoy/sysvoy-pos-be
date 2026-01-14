@@ -14,17 +14,26 @@ import { ProductImage } from "../product/product.types.js";
 
 export class CategoryService {
   async create({ user, data, file }: CreateCategoryParams) {
+    const { organizationId } = user;
+
+    if (!organizationId) {
+      throw new HttpError("User does not belong to any organization", 400);
+    }
+
     return prismaClient.$transaction(async (tx) => {
-      // Check if category exists
       const existing = await tx.category.findUnique({
-        where: { name: data.name },
+        where: {
+          name_organizationId: {
+            name: data.name,
+            organizationId,
+          },
+        },
       });
 
       if (existing) {
         throw new HttpError("Category with this name already exists", 400);
       }
 
-      // Upload image if provided
       let imageUrl: string | null = null;
       let imagePublicId: string | null = null;
 
@@ -34,40 +43,45 @@ export class CategoryService {
         imagePublicId = result.publicId;
       }
 
-      const category = await tx.category.create({
+      return tx.category.create({
         data: {
           ...data,
           imageUrl,
           imagePublicId,
-          createdBy: { connect: { id: user.id } },
+          organization: {
+            connect: { id: organizationId },
+          },
         },
       });
-
-      return category;
     });
   }
 
-  async getAll({ pageIndex, pageSize, search }: GetCategoriesOptions) {
+  async getAll({ user, pageIndex, pageSize, search }: GetCategoriesOptions) {
     const skip = pageIndex * pageSize;
+    const { organizationId } = user;
+    if (!organizationId) {
+      throw new HttpError("User does not belong to any organization", 400);
+    }
 
-    const where: PrismaTypes.CategoryWhereInput | undefined = search
-      ? {
-          OR: [
-            {
-              name: {
-                contains: search,
-                mode: PrismaTypes.QueryMode.insensitive,
-              },
+    const where: PrismaTypes.CategoryWhereInput = {
+      organizationId,
+      ...(search && {
+        OR: [
+          {
+            name: {
+              contains: search,
+              mode: PrismaTypes.QueryMode.insensitive,
             },
-            {
-              description: {
-                contains: search,
-                mode: PrismaTypes.QueryMode.insensitive,
-              },
+          },
+          {
+            description: {
+              contains: search,
+              mode: PrismaTypes.QueryMode.insensitive,
             },
-          ],
-        }
-      : undefined;
+          },
+        ],
+      }),
+    };
 
     const [rawCategories, total] = await Promise.all([
       prismaClient.category.findMany({
@@ -100,18 +114,28 @@ export class CategoryService {
     };
   }
 
-  async getById(id: string) {
+  async getById(user: any, id: string) {
+    const { organizationId } = user;
+    if (!organizationId) {
+      throw new HttpError("User does not belong to any organization", 400);
+    }
+
     return await prismaClient.category.findUnique({
-      where: { id },
+      where: { id, organizationId },
     });
   }
 
-  async update({ id, data, file }: UpdateCategoryParams) {
+  async update({ user, id, data, file }: UpdateCategoryParams) {
     let uploadedImage: { url: string; publicId: string } | null = null;
+
+    const { organizationId } = user;
+    if (!organizationId) {
+      throw new HttpError("User does not belong to any organization", 400);
+    }
 
     // Fetch category
     const category = await prismaClient.category.findUnique({
-      where: { id },
+      where: { id, organizationId },
     });
 
     if (!category) {
@@ -183,12 +207,17 @@ export class CategoryService {
     }
   }
 
-  async delete(id: string) {
+  async delete(user: any, id: string) {
+    const { organizationId } = user;
+    if (!organizationId) {
+      throw new HttpError("User does not belong to any organization", 400);
+    }
+
     // check category
     const category = await prismaClient.category.findUnique({
-      where: { id },
+      where: { id, organizationId },
       include: {
-        products: { select: { id: true , images: true } },
+        products: { select: { id: true, images: true } },
       },
     });
 

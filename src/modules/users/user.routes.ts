@@ -11,18 +11,18 @@ import {
 const router = Router();
 
 // Get all users (admin only)
-router.get("/", requireAdmin, getUsers);
+router.get("/", getUsers);
 
 // Get user by ID (admin only)
-router.get("/:id", requireAdmin, getUserById);
+router.get("/:id", getUserById);
 
 // Create user (admin only)
-router.post("/", requireAdmin, createUser);
+router.post("/", createUser);
 
 // Update user (admin only)
-router.put("/:id", requireAdmin, updateUser);
+router.put("/:id", updateUser);
 
 // Delete user (admin only)
-router.delete("/:id", requireAdmin, deleteUser);
+router.delete("/:id", deleteUser);
 
 export default router;

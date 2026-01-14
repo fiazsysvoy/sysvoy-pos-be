@@ -1,0 +1,5 @@
+-- CreateEnum
+CREATE TYPE "AccountStatus" AS ENUM ('UNVERIFIED_EMAIL', 'ORG_UNATTACHED', 'VERIFIED_EMAIL');
+
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN     "status" "AccountStatus" NOT NULL DEFAULT 'UNVERIFIED_EMAIL';

@@ -13,6 +13,7 @@ const userService = new UserService();
 // GET /users
 export const getUsers = asyncHandler(async (req, res) => {
   const parsed = getUsersQuerySchema.safeParse(req.query);
+  const user = req.user!;
 
   if (!parsed.success) {
     return res
@@ -23,6 +24,7 @@ export const getUsers = asyncHandler(async (req, res) => {
   const { pageIndex, pageSize, search } = parsed.data;
 
   const result = await userService.getAll({
+    user,
     pageIndex,
     pageSize,
     search,
@@ -57,7 +59,13 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
     const { email, password, name, role } = parsed.data;
 
     // Create user
-    const user = await userService.createUser(email, password, name, role);
+    const user = await userService.createUser(
+      req.user!,
+      email,
+      password,
+      name,
+      role,
+    );
     res.status(201).json({ message: "User created successfully", user });
   } catch (err: any) {
     res.status(400).json({ message: err.message });
@@ -78,7 +86,11 @@ export const updateUser = asyncHandler(async (req: Request, res: Response) => {
     });
   }
 
-  const user = await userService.update(paramsParsed.data.id, bodyParsed.data);
+  const user = await userService.update(
+    paramsParsed.data.id,
+    bodyParsed.data,
+    req.user!,
+  );
 
   res.status(200).json({ message: "User updated", user });
 });
@@ -90,6 +102,6 @@ export const deleteUser = asyncHandler(async (req: Request, res: Response) => {
     return res.status(400).json({ errors: parsed.error.issues });
   }
 
-  await userService.delete(parsed.data.id);
+  await userService.delete(parsed.data.id, req.user!);
   res.status(204).send();
 });

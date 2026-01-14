@@ -6,6 +6,7 @@ import {
 import { User } from "../../../generated/prisma/client.js";
 
 export interface GetCategoriesOptions {
+  user: User;
   pageIndex: number;
   pageSize: number;
   search?: string;
@@ -21,6 +22,7 @@ export interface CreateCategoryParams {
 
 export interface UpdateCategoryParams {
   id: string;
+  user: User;
   data: UpdateCategoryDTO;
   file?: Express.Multer.File; // new image file
 }

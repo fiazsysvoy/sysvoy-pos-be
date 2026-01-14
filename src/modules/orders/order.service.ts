@@ -58,6 +58,9 @@ export class OrderService {
           createdBy: {
             connect: { id: user.id },
           },
+          organization: {
+            connect: { id: user.organizationId! },
+          },
         },
       });
 
@@ -69,6 +72,7 @@ export class OrderService {
             productId: item.productId,
             quantity: item.quantity,
             price: item.price,
+            organizationId: user.organizationId!,
           },
         });
 
@@ -102,14 +106,17 @@ export class OrderService {
   async getAll({
     pageIndex,
     pageSize,
+    user,
   }: {
     pageIndex: number;
     pageSize: number;
+    user: User;
   }) {
     const skip = pageIndex * pageSize;
 
     const [orders, total] = await Promise.all([
       prismaClient.order.findMany({
+        where: { organizationId: user.organizationId! },
         skip,
         take: pageSize,
         orderBy: { createdAt: "desc" },
@@ -121,7 +128,9 @@ export class OrderService {
           },
         },
       }),
-      prismaClient.order.count(),
+      prismaClient.order.count({
+        where: { organizationId: user.organizationId! },
+      }),
     ]);
 
     return {
@@ -135,9 +144,13 @@ export class OrderService {
     };
   }
 
-  getById(id: string) {
-    return prismaClient.order.findUnique({
-      where: { id },
+  async getById(id: string, user: User) {
+    const organizationId = user.organizationId;
+    if (!organizationId) {
+      throw new Error("User does not belong to any organization");
+    }
+    const order = await prismaClient.order.findUnique({
+      where: { id, organizationId },
       include: {
         items: {
           include: {
@@ -146,6 +159,10 @@ export class OrderService {
         },
       },
     });
+    if (!order) {
+      throw new HttpError("Order not found", 404);
+    }
+    return order;
   }
 
   async returnItems(user: User, data: ReturnOrderData) {
@@ -153,7 +170,7 @@ export class OrderService {
 
     // Get the order with items
     const order = await prismaClient.order.findUnique({
-      where: { id: orderId },
+      where: { id: orderId, organizationId: user.organizationId! },
       include: {
         items: {
           include: {
@@ -219,6 +236,7 @@ export class OrderService {
           orderId,
           refundedAmount,
           createdById: user.id,
+          organizationId: user.organizationId!,
         },
       });
 
@@ -228,6 +246,7 @@ export class OrderService {
 
         await tx.returnItem.create({
           data: {
+            organizationId: user.organizationId!,
             returnId: returnRecord.id,
             orderItemId: item.orderItemId,
             quantity: item.quantity,
@@ -252,7 +271,7 @@ export class OrderService {
 
     // Return the complete return record with items
     return prismaClient.return.findUnique({
-      where: { id: result.id },
+      where: { id: result.id, organizationId: user.organizationId! },
       include: {
         items: {
           include: {

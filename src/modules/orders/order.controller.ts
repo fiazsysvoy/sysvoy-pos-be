@@ -31,6 +31,7 @@ export const createOrder = asyncHandler(async (req: Request, res: Response) => {
 export const getAllOrders = asyncHandler(
   async (req: Request, res: Response) => {
     const parsed = getOrdersQuerySchema.safeParse(req.query);
+    const user = req.user!;
 
     if (!parsed.success) {
       return res
@@ -38,7 +39,7 @@ export const getAllOrders = asyncHandler(
         .json({ errors: parsed.error.issues.map((i) => i.message) });
     }
 
-    const result = await orderService.getAll(parsed.data);
+    const result = await orderService.getAll({ ...parsed.data, user });
 
     res.json({
       success: true,
@@ -50,6 +51,7 @@ export const getAllOrders = asyncHandler(
 export const getOrderById = asyncHandler(
   async (req: Request, res: Response) => {
     const parsed = orderIdParamSchema.safeParse(req.params);
+    const user = req.user!;
 
     if (!parsed.success) {
       return res
@@ -57,7 +59,7 @@ export const getOrderById = asyncHandler(
         .json({ errors: parsed.error.issues.map((i) => i.message) });
     }
 
-    const order = await orderService.getById(parsed.data.id);
+    const order = await orderService.getById(parsed.data.id, user);
 
     if (!order) {
       return res.status(404).json({

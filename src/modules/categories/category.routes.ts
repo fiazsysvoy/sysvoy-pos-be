@@ -1,5 +1,4 @@
 import { Router } from "express";
-import { requireAdmin } from "../../middlewares/auth.middleware.js";
 import { safeUpload } from "../../middlewares/safeUpload.js";
 import { upload } from "../../middlewares/multer.js";
 import {
@@ -13,12 +12,7 @@ import {
 const router = Router();
 
 // Create category (admin only, with image upload)
-router.post(
-  "/",
-  requireAdmin,
-  safeUpload(upload.single("image")),
-  createCategory,
-);
+router.post("/", safeUpload(upload.single("image")), createCategory);
 
 // Get all categories (paginated, searchable)
 router.get("/", getCategories);
@@ -27,14 +21,9 @@ router.get("/", getCategories);
 router.get("/:id", getCategoryById);
 
 // Update category (admin only)
-router.patch(
-  "/:id",
-  requireAdmin,
-  safeUpload(upload.single("image")),
-  updateCategory,
-);
+router.patch("/:id", safeUpload(upload.single("image")), updateCategory);
 
 // Delete category (admin only)
-router.delete("/:id", requireAdmin, deleteCategory);
+router.delete("/:id", deleteCategory);
 
 export default router;
