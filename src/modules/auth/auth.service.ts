@@ -7,7 +7,7 @@ import { HttpError } from "../../utils/HttpError.js";
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret";
 
 export class AuthService {
-  async signup(email: string, password: string) {
+  async signup(name: string, email: string, password: string) {
     const userExists = await prismaClient.user.findUnique({
       where: { email },
     });
@@ -25,6 +25,7 @@ export class AuthService {
     const user = await prismaClient.user.create({
       data: {
         email,
+        name,
         password: hashedPassword,
         verificationCode,
         verificationCodeExpiresAt,

@@ -20,40 +20,48 @@ export class CategoryService {
       throw new HttpError("User does not belong to any organization", 400);
     }
 
-    return prismaClient.$transaction(async (tx) => {
-      const existing = await tx.category.findUnique({
-        where: {
-          name_organizationId: {
-            name: data.name,
-            organizationId,
+    let imageUrl: string | null = null;
+    let imagePublicId: string | null = null;
+
+    if (file) {
+      const result = await uploadImage(file.buffer, "categories");
+      imageUrl = result.url;
+      imagePublicId = result.publicId;
+    }
+
+    try {
+      return await prismaClient.$transaction(async (tx) => {
+        const existing = await tx.category.findUnique({
+          where: {
+            name_organizationId: {
+              name: data.name,
+              organizationId,
+            },
           },
-        },
-      });
+        });
 
-      if (existing) {
-        throw new HttpError("Category with this name already exists", 400);
-      }
+        if (existing) {
+          throw new HttpError("Category with this name already exists", 400);
+        }
 
-      let imageUrl: string | null = null;
-      let imagePublicId: string | null = null;
-
-      if (file) {
-        const result = await uploadImage(file.buffer, "categories");
-        imageUrl = result.url;
-        imagePublicId = result.publicId;
-      }
-
-      return tx.category.create({
-        data: {
-          ...data,
-          imageUrl,
-          imagePublicId,
-          organization: {
-            connect: { id: organizationId },
+        return tx.category.create({
+          data: {
+            ...data,
+            imageUrl,
+            imagePublicId,
+            organization: {
+              connect: { id: organizationId },
+            },
           },
-        },
+        });
       });
-    });
+    } catch (error) {
+      // Rollback uploaded image manually
+      if (imagePublicId) {
+        await deleteImage(imagePublicId);
+      }
+      throw error;
+    }
   }
 
   async getAll({ user, pageIndex, pageSize, search }: GetCategoriesOptions) {

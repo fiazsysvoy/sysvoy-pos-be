@@ -20,8 +20,8 @@ export const signup = asyncHandler(async (req, res) => {
       .status(400)
       .json({ errors: parsed.error.issues.map((issue) => issue.message) });
   }
-  const { email, password } = parsed.data;
-  const user = await authService.signup(email, password);
+  const { name, email, password } = parsed.data;
+  const user = await authService.signup(name, email, password);
   res.status(201).json({
     message: "User created successfully. Please verify your email.",
     user,
