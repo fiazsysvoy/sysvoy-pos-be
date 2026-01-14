@@ -115,10 +115,21 @@ model Product {
   @@unique([id, organizationId])
 }
 
+enum OrderStatus {
+  IN_PROCESS
+  COMPLETED
+  CANCELLED
+}
+
 model Order {
   id          String   @id @default(uuid())
   totalAmount Float
+  status OrderStatus @default(IN_PROCESS)
+
   createdAt   DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  completedAt  DateTime?
+  cancelledAt  DateTime?
 
   items OrderItem[]
 

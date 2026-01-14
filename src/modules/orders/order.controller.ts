@@ -5,6 +5,7 @@ import {
   returnOrderSchema,
   orderIdParamSchema,
   getOrdersQuerySchema,
+  updateOrderSchema,
 } from "./order.schema.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 
@@ -24,6 +25,35 @@ export const createOrder = asyncHandler(async (req: Request, res: Response) => {
   res.status(201).json({
     success: true,
     message: "Order created successfully",
+    data: order,
+  });
+});
+
+export const updateOrder = asyncHandler(async (req: Request, res: Response) => {
+  const parsedParams = orderIdParamSchema.safeParse(req.params);
+  const parsedBody = updateOrderSchema.partial().safeParse(req.body);
+
+  if (!parsedParams.success) {
+    return res
+      .status(400)
+      .json({ errors: parsedParams.error.issues.map((i) => i.message) });
+  }
+
+  if (!parsedBody.success) {
+    return res
+      .status(400)
+      .json({ errors: parsedBody.error.issues.map((i) => i.message) });
+  }
+
+  const order = await orderService.update(
+    req.user!,
+    parsedParams.data.id,
+    parsedBody.data,
+  );
+
+  res.json({
+    success: true,
+    message: "Order updated successfully",
     data: order,
   });
 });

@@ -1,5 +1,5 @@
 import { prismaClient } from "../../lib/prisma.js";
-import { User } from "../../../generated/prisma/client.js";
+import { Order, User } from "../../../generated/prisma/client.js";
 import { HttpError } from "../../utils/HttpError.js";
 import { CreateOrderData, ReturnOrderData } from "./order.types.js";
 
@@ -23,7 +23,7 @@ export class OrderService {
       if (!product || product.stock < item.quantity) {
         throw new HttpError(
           `Insufficient stock for product: ${product?.name || item.productId}`,
-          400,
+          400
         );
       }
     }
@@ -100,6 +100,79 @@ export class OrderService {
           },
         },
       },
+    });
+  }
+
+  async update(user: User, orderId: string, data: Partial<Order>) {
+    const organizationId = user.organizationId;
+
+    if (!organizationId) {
+      throw new HttpError("User does not belong to any organization", 400);
+    }
+
+    return prismaClient.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({
+        where: { id_organizationId: { id: orderId, organizationId } },
+        include: { items: true },
+      });
+
+      if (!order) {
+        throw new HttpError("Order not found", 404);
+      }
+
+      if (!data.status || data.status === order.status) {
+        return order;
+      }
+
+      // Enforce valid transitions
+      if (order.status !== "IN_PROCESS") {
+        throw new HttpError("Only IN_PROCESS orders can be updated", 400);
+      }
+
+      if (data.status === "CANCELLED") {
+        // Restock items
+        for (const item of order.items) {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: {
+              stock: {
+                increment: item.quantity,
+              },
+            },
+          });
+        }
+
+        return tx.order.update({
+          where: { id_organizationId: { id: orderId, organizationId } },
+          data: {
+            status: "CANCELLED",
+            cancelledAt: new Date(),
+            completedAt: null,
+          },
+          include: {
+            items: {
+              include: { product: true },
+            },
+          },
+        });
+      }
+
+      if (data.status === "COMPLETED") {
+        return tx.order.update({
+          where: { id_organizationId: { id: orderId, organizationId } },
+          data: {
+            status: "COMPLETED",
+            completedAt: new Date(),
+          },
+          include: {
+            items: {
+              include: { product: true },
+            },
+          },
+        });
+      }
+
+      throw new HttpError("Invalid order status", 400);
     });
   }
 
@@ -193,7 +266,7 @@ export class OrderService {
 
     for (const returnItem of items) {
       const orderItem = order.items.find(
-        (item) => item.id === returnItem.orderItemId,
+        (item) => item.id === returnItem.orderItemId
       );
       if (!orderItem) {
         throw new HttpError(`Order item ${returnItem.orderItemId} not found`);
@@ -206,18 +279,18 @@ export class OrderService {
 
       const totalReturned = existingReturns.reduce(
         (sum, ret) => sum + ret.quantity,
-        0,
+        0
       );
       const availableToReturn = orderItem.quantity - totalReturned;
 
       if (returnItem.quantity > availableToReturn) {
         if (availableToReturn === 0) {
           throw new HttpError(
-            `Cannot return ${returnItem.quantity} items. Order item: ${orderItem.product.name} has already been returned`,
+            `Cannot return ${returnItem.quantity} items. Order item: ${orderItem.product.name} has already been returned`
           );
         }
         throw new HttpError(
-          `Cannot return ${returnItem.quantity} items. Only ${availableToReturn} could be returned`,
+          `Cannot return ${returnItem.quantity} items. Only ${availableToReturn} could be returned`
         );
       }
 

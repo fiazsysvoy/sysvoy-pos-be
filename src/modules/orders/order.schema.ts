@@ -16,6 +16,10 @@ export const createOrderSchema = z.object({
     .min(1, "Order must contain at least one item"),
 });
 
+export const updateOrderSchema = z.object({
+  status: z.enum(["IN_PROCESS", "COMPLETED", "CANCELLED"]).optional(),
+});
+
 export const returnItemSchema = z.object({
   orderItemId: z
     .string("Return item must have an order item ID")

@@ -9,6 +9,9 @@ router.get("/", orderController.getAllOrders);
 // get order by id
 router.get("/:id", orderController.getOrderById);
 
+// update order
+router.patch("/:id", orderController.updateOrder);
+
 // create an order
 router.post("/", orderController.createOrder);
 
