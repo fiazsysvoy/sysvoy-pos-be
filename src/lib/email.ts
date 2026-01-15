@@ -46,6 +46,20 @@ export class EmailService {
     return this.sendEmail(to, subject, html);
   }
 
+  async sendInviteEmail(email: string, orgName: string, password: string) {
+    const subject = "Invite to join organization - POS System";
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+    const loginLink = `${frontendUrl}/login`;
+    const html = `
+      <h1>Invite to join organization</h1>
+      <p>You have been invited to join the organization: <strong>${orgName}</strong></p>
+      <p>Your password is: <strong>${password}</strong></p>
+      <p>Click the link below to login:</p>
+      <a href="${loginLink}">Login</a>
+    `;
+    return this.sendEmail(email, subject, html);
+  }
+
   async sendPasswordResetEmail(to: string, link: string) {
     const subject = "Reset your password";
     const html = `

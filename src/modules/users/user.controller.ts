@@ -7,6 +7,7 @@ import {
   userIdParamSchema,
 } from "./user.schema.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
+import crypto from "crypto";
 
 const userService = new UserService();
 
@@ -56,7 +57,10 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
         .status(400)
         .json({ errors: parsed.error.issues.map((issue) => issue.message) });
     }
-    const { email, password, name, role } = parsed.data;
+    const { email, name, role } = parsed.data;
+
+    // random 8 digit pass(alphabetic + numeric)
+    const password = crypto.randomBytes(4).toString("hex");
 
     // Create user
     const user = await userService.createUser(

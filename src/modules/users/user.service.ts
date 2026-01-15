@@ -5,6 +5,7 @@ import {
   User,
 } from "../../../generated/prisma/client.js"; // for types
 import { HttpError } from "../../utils/HttpError.js";
+import { emailService } from "../../lib/email.js";
 
 interface GetUsersOptions {
   pageIndex: number;
@@ -98,6 +99,16 @@ export class UserService {
     });
     if (existingUser) throw new HttpError("User already exists", 409);
 
+    const organizationId = user.organizationId;
+    if(!organizationId){
+      throw new HttpError('User must be attached to an organization.' , 400);
+    }
+
+    const organization = await prismaClient.organization.findUnique({where: {id: organizationId}})
+    if(!organization){
+      throw new HttpError('Organization not found.');
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = await prismaClient.user.create({
@@ -116,6 +127,9 @@ export class UserService {
         role: true,
       },
     });
+
+    // send email to user with password - TODO: implement email service
+    await emailService.sendInviteEmail(email, organization.name, password, )
 
     return newUser;
   }
