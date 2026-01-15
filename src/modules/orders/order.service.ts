@@ -90,13 +90,20 @@ export class OrderService {
       return order;
     });
 
-    // Return the complete order with items
+    // Return the complete order with items and creator info
     return prismaClient.order.findUnique({
       where: { id: result.id },
       include: {
         items: {
           include: {
             product: true,
+          },
+        },
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
           },
         },
       },
@@ -199,6 +206,13 @@ export class OrderService {
               product: true,
             },
           },
+          createdBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
         },
       }),
       prismaClient.order.count({
@@ -228,6 +242,13 @@ export class OrderService {
         items: {
           include: {
             product: true,
+          },
+        },
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
           },
         },
       },
