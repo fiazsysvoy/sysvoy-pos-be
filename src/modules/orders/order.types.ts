@@ -5,6 +5,13 @@ export interface CreateOrderData {
   }>;
 }
 
+export interface UpdateOrderItemsData {
+  items: Array<{
+    productId: string;
+    quantity: number;
+  }>;
+}
+
 export interface ReturnOrderData {
   orderId: string;
   items: Array<{

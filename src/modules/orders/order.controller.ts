@@ -58,6 +58,37 @@ export const updateOrder = asyncHandler(async (req: Request, res: Response) => {
   });
 });
 
+export const updateOrderItems = asyncHandler(
+  async (req: Request, res: Response) => {
+    const parsedParams = orderIdParamSchema.safeParse(req.params);
+
+    if (!parsedParams.success) {
+      return res
+        .status(400)
+        .json({ errors: parsedParams.error.issues.map((i) => i.message) });
+    }
+
+    const { items } = req.body as { items?: Array<{ productId: string; quantity: number }> };
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        errors: ["Order must contain at least one item"],
+      });
+    }
+
+    const updatedOrder = await orderService.updateItems(
+      req.user!,
+      parsedParams.data.id,
+      { items },
+    );
+
+    res.json({
+      success: true,
+      message: "Order items updated successfully",
+      data: updatedOrder,
+    });
+  },
+);
+
 export const getAllOrders = asyncHandler(
   async (req: Request, res: Response) => {
     const parsed = getOrdersQuerySchema.safeParse(req.query);

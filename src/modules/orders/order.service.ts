@@ -1,7 +1,11 @@
 import { prismaClient } from "../../lib/prisma.js";
 import { Order, User } from "../../../generated/prisma/client.js";
 import { HttpError } from "../../utils/HttpError.js";
-import { CreateOrderData, ReturnOrderData } from "./order.types.js";
+import {
+  CreateOrderData,
+  ReturnOrderData,
+  UpdateOrderItemsData,
+} from "./order.types.js";
 
 export class OrderService {
   async create(user: User, data: CreateOrderData) {
@@ -180,6 +184,176 @@ export class OrderService {
       }
 
       throw new HttpError("Invalid order status", 400);
+    });
+  }
+
+  async updateItems(
+    user: User,
+    orderId: string,
+    data: UpdateOrderItemsData,
+  ) {
+    const organizationId = user.organizationId;
+
+    if (!organizationId) {
+      throw new HttpError("User does not belong to any organization", 400);
+    }
+
+    const { items } = data;
+
+    return prismaClient.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({
+        where: { id_organizationId: { id: orderId, organizationId } },
+        include: {
+          items: true,
+        },
+      });
+
+      if (!order) {
+        throw new HttpError("Order not found", 404);
+      }
+
+      if (order.status !== "IN_PROCESS") {
+        throw new HttpError("Only IN_PROCESS orders can be edited", 400);
+      }
+
+      // Map current quantities for quick lookup
+      const existingItemsByProductId = new Map<
+        string,
+        { id: string; quantity: number }
+      >();
+      for (const item of order.items) {
+        existingItemsByProductId.set(item.productId, {
+          id: item.id,
+          quantity: item.quantity,
+        });
+      }
+
+      // Collect all products involved (existing and new)
+      const productIds = Array.from(
+        new Set([
+          ...order.items.map((i) => i.productId),
+          ...items.map((i) => i.productId),
+        ]),
+      );
+
+      const products = await tx.product.findMany({
+        where: {
+          id: { in: productIds },
+          organizationId,
+        },
+      });
+
+      if (products.length !== productIds.length) {
+        throw new HttpError("One or more products not found", 400);
+      }
+
+      // Validate stock availability with delta logic
+      for (const item of items) {
+        const product = products.find((p) => p.id === item.productId);
+        if (!product) {
+          throw new HttpError("Product not found", 400);
+        }
+
+        const existing = existingItemsByProductId.get(item.productId);
+        const existingQty = existing ? existing.quantity : 0;
+        const delta = item.quantity - existingQty; // positive => need more stock, negative => release stock
+
+        if (delta > 0 && product.stock < delta) {
+          throw new HttpError(
+            `Insufficient stock for product: ${product.name}`,
+            400,
+          );
+        }
+      }
+
+      // Apply item updates and track new total
+      let newTotalAmount = 0;
+
+      // First, delete items that are no longer present
+      const incomingProductIds = new Set(items.map((i) => i.productId));
+      for (const existingItem of order.items) {
+        if (!incomingProductIds.has(existingItem.productId)) {
+          // Delete order item and restock quantity
+          await tx.orderItem.delete({
+            where: { id: existingItem.id },
+          });
+
+          await tx.product.update({
+            where: { id: existingItem.productId },
+            data: {
+              stock: {
+                increment: existingItem.quantity,
+              },
+            },
+          });
+        }
+      }
+
+      // Upsert incoming items and adjust stock by delta
+      for (const item of items) {
+        const product = products.find((p) => p.id === item.productId)!;
+        const existing = existingItemsByProductId.get(item.productId);
+        const existingQty = existing ? existing.quantity : 0;
+        const delta = item.quantity - existingQty;
+
+        if (existing) {
+          // Update quantity
+          await tx.orderItem.update({
+            where: { id: existing.id },
+            data: {
+              quantity: item.quantity,
+            },
+          });
+        } else {
+          // Create new order item
+          await tx.orderItem.create({
+            data: {
+              orderId: order.id,
+              productId: item.productId,
+              quantity: item.quantity,
+              price: product.price,
+              organizationId,
+            },
+          });
+        }
+
+        // Update product stock based on delta
+        if (delta !== 0) {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: {
+              stock: {
+                // if delta > 0, decrement; if delta < 0, increment
+                [delta > 0 ? "decrement" : "increment"]: Math.abs(delta),
+              },
+            },
+          });
+        }
+
+        newTotalAmount += product.price * item.quantity;
+      }
+
+      // Update order total amount
+      const updatedOrder = await tx.order.update({
+        where: { id_organizationId: { id: orderId, organizationId } },
+        data: {
+          totalAmount: newTotalAmount,
+        },
+        include: {
+          items: {
+            include: { product: true },
+          },
+          createdBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+      return updatedOrder;
     });
   }
 

@@ -12,6 +12,9 @@ router.get("/:id", orderController.getOrderById);
 // update order
 router.patch("/:id", orderController.updateOrder);
 
+// update order items (quantities & stock)
+router.put("/:id", orderController.updateOrderItems);
+
 // create an order
 router.post("/", orderController.createOrder);
 
