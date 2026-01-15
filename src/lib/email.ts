@@ -1,12 +1,16 @@
 import nodemailer from "nodemailer";
+import hbs from "nodemailer-express-handlebars";
+import path from "path";
 
 const SMTP_HOST = process.env.MAIL_HOST || "smtp.ethereal.email";
 const SMTP_PORT = parseInt(process.env.MAIL_PORT || "587");
 const SMTP_USER = process.env.MAIL_USER || "user";
 const SMTP_PASS = process.env.MAIL_PASS || "pass";
-const SMTP_FROM = process.env.MAIL_FROM || '"Support" <support@example.com>';
+const SMTP_FROM =
+  process.env.MAIL_FROM || '"Support" <support@example.com>';
+
 export class EmailService {
-  private transporter;
+  private transporter: nodemailer.Transporter;
 
   constructor() {
     this.transporter = nodemailer.createTransport({
@@ -18,17 +22,43 @@ export class EmailService {
         pass: SMTP_PASS,
       },
     });
+
+    // Handlebars (HBS) configuration
+    const templatesPath = path.resolve(
+      process.cwd(),
+      "src",
+      "email-templates"
+    );
+
+    this.transporter.use(
+      "compile",
+      hbs({
+        viewEngine: {
+          extname: ".hbs",
+          partialsDir: templatesPath,
+          defaultLayout: false,
+        },
+        viewPath: templatesPath,
+        extName: ".hbs",
+      })
+    );
   }
 
-  async sendEmail(to: string, subject: string, html: string) {
+  private async sendEmail(
+    to: string,
+    subject: string,
+    template: string,
+    context: Record<string, any>
+  ) {
     try {
       const info = await this.transporter.sendMail({
         from: SMTP_FROM,
         to,
         subject,
-        html,
+        template,
+        context,
       });
-      console.log("Message sent: %s", info.messageId);
+
       return info;
     } catch (error) {
       console.error("Error sending email:", error);
@@ -37,39 +67,35 @@ export class EmailService {
   }
 
   async sendVerificationEmail(to: string, code: string) {
-    const subject = "Verify your email";
-    const html = `
-      <h1>Verify your email</h1>
-      <p>Your verification code is: <strong>${code}</strong></p>
-      <p>This code will expire in 15 minutes.</p>
-    `;
-    return this.sendEmail(to, subject, html);
+    return this.sendEmail(to, "Verify your email", "verification", {
+      code,
+    });
   }
 
-  async sendInviteEmail(email: string, orgName: string, password: string) {
-    const subject = "Invite to join organization - POS System";
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
-    const loginLink = `${frontendUrl}/login`;
-    const html = `
-      <h1>Invite to join organization</h1>
-      <p>You have been invited to join the organization: <strong>${orgName}</strong></p>
-      <p>Your password is: <strong>${password}</strong></p>
-      <p>Click the link below to login:</p>
-      <a href="${loginLink}">Login</a>
-    `;
-    return this.sendEmail(email, subject, html);
+  async sendInviteEmail(
+    email: string,
+    orgName: string,
+    password: string
+  ) {
+    const frontendUrl =
+      process.env.FRONTEND_URL || "http://localhost:3000";
+
+    return this.sendEmail(
+      email,
+      "Invite to join organization - POS System",
+      "invite",
+      {
+        orgName,
+        password,
+        loginLink: `${frontendUrl}/login`,
+      }
+    );
   }
 
   async sendPasswordResetEmail(to: string, link: string) {
-    const subject = "Reset your password";
-    const html = `
-      <h1>Reset your password</h1>
-      <p>Click the link below to reset your password:</p>
-      <a href="${link}">Reset Password</a>
-      <p>If you didn't request this, please ignore this email.</p>
-      <p>This link will expire in 15 minutes.</p>
-    `;
-    return this.sendEmail(to, subject, html);
+    return this.sendEmail(to, "Reset your password", "reset-password", {
+      resetLink: link,
+    });
   }
 }
 
