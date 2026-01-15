@@ -14,6 +14,7 @@ export const createOrderSchema = z.object({
   items: z
     .array(orderItemSchema)
     .min(1, "Order must contain at least one item"),
+  name: z.string("Order must have a name").optional(),
 });
 
 export const updateOrderSchema = z.object({
@@ -21,6 +22,7 @@ export const updateOrderSchema = z.object({
 });
 
 export const updateOrderItemsSchema = z.object({
+  name: z.string("Order must have a name").optional(),
   items: z
     .array(
       z.object({

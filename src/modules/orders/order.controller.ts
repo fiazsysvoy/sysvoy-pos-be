@@ -48,7 +48,7 @@ export const updateOrder = asyncHandler(async (req: Request, res: Response) => {
   const order = await orderService.update(
     req.user!,
     parsedParams.data.id,
-    parsedBody.data,
+    parsedBody.data
   );
 
   res.json({
@@ -68,7 +68,10 @@ export const updateOrderItems = asyncHandler(
         .json({ errors: parsedParams.error.issues.map((i) => i.message) });
     }
 
-    const { items } = req.body as { items?: Array<{ productId: string; quantity: number }> };
+    const { items, name } = req.body as {
+      items?: Array<{ productId: string; quantity: number }>;
+      name: string;
+    };
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({
         errors: ["Order must contain at least one item"],
@@ -78,7 +81,7 @@ export const updateOrderItems = asyncHandler(
     const updatedOrder = await orderService.updateItems(
       req.user!,
       parsedParams.data.id,
-      { items },
+      { items, name }
     );
 
     res.json({
@@ -86,7 +89,7 @@ export const updateOrderItems = asyncHandler(
       message: "Order items updated successfully",
       data: updatedOrder,
     });
-  },
+  }
 );
 
 export const getAllOrders = asyncHandler(
@@ -106,7 +109,7 @@ export const getAllOrders = asyncHandler(
       success: true,
       data: result,
     });
-  },
+  }
 );
 
 export const getOrderById = asyncHandler(
@@ -133,7 +136,7 @@ export const getOrderById = asyncHandler(
       success: true,
       data: order,
     });
-  },
+  }
 );
 
 export const returnOrderItems = asyncHandler(
@@ -153,5 +156,5 @@ export const returnOrderItems = asyncHandler(
       message: "Items returned successfully",
       data: returnRecord,
     });
-  },
+  }
 );

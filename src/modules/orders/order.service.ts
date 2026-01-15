@@ -9,7 +9,7 @@ import {
 
 export class OrderService {
   async create(user: User, data: CreateOrderData) {
-    const { items } = data;
+    const { items, name } = data;
 
     // Validate products and calculate total
     const productIds = items.map((item) => item.productId);
@@ -59,6 +59,7 @@ export class OrderService {
       const order = await tx.order.create({
         data: {
           totalAmount,
+          name: name || "Order",
           createdBy: {
             connect: { id: user.id },
           },
@@ -193,12 +194,11 @@ export class OrderService {
     data: UpdateOrderItemsData,
   ) {
     const organizationId = user.organizationId;
-
     if (!organizationId) {
       throw new HttpError("User does not belong to any organization", 400);
     }
 
-    const { items } = data;
+    const { items, name } = data;
 
     return prismaClient.$transaction(async (tx) => {
       const order = await tx.order.findUnique({
@@ -337,6 +337,8 @@ export class OrderService {
       const updatedOrder = await tx.order.update({
         where: { id_organizationId: { id: orderId, organizationId } },
         data: {
+          // if name is not provided dont pass it to update
+          name: name || undefined,
           totalAmount: newTotalAmount,
         },
         include: {

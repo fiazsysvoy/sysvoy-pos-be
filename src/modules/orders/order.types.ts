@@ -1,4 +1,5 @@
 export interface CreateOrderData {
+  name?: string;
   items: Array<{
     productId: string;
     quantity: number;
@@ -6,6 +7,7 @@ export interface CreateOrderData {
 }
 
 export interface UpdateOrderItemsData {
+  name?: string;
   items: Array<{
     productId: string;
     quantity: number;

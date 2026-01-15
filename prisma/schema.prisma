@@ -123,6 +123,7 @@ enum OrderStatus {
 
 model Order {
   id          String   @id @default(uuid())
+  name String @default("Order")
   totalAmount Float
   status OrderStatus @default(IN_PROCESS)
 
