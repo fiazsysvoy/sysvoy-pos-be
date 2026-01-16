@@ -1,28 +1,21 @@
 import { Router } from "express";
-import { requireAdmin } from "../../middlewares/auth.middleware.js";
-import {
-  getUsers,
-  getUserById,
-  createUser,
-  updateUser,
-  deleteUser,
-} from "./user.controller.js";
+import * as UserController from "./user.controller.js";
 
 const router = Router();
 
 // Get all users (admin only)
-router.get("/", getUsers);
+router.get("/", UserController.getUsers);
 
 // Get user by ID (admin only)
-router.get("/:id", getUserById);
+router.get("/:id", UserController.getUserById);
 
 // Create user (admin only)
-router.post("/", createUser);
+router.post("/", UserController.createUser);
 
 // Update user (admin only)
-router.put("/:id", updateUser);
+router.put("/:id", UserController.updateUser);
 
 // Delete user (admin only)
-router.delete("/:id", deleteUser);
+router.delete("/:id", UserController.deleteUser);
 
 export default router;

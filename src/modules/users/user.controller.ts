@@ -40,7 +40,7 @@ export const getUserById = asyncHandler(async (req: Request, res: Response) => {
     return res.status(400).json({ errors: parsed.error.issues });
   }
 
-  const user = await userService.getById(parsed.data.id);
+  const user = await userService.getById(parsed.data.id, req.user!);
   if (!user) {
     return res.status(404).json({ message: "User not found" });
   }

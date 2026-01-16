@@ -70,8 +70,9 @@ export class UserService {
     };
   }
 
-  async getById(id: string, user?: User) {
-    const organizationId = user?.organizationId;
+
+  async getById(id: string, user: User) {
+    const organizationId = user.organizationId;
     if (!organizationId) {
       throw new HttpError("User does not belong to any organization", 400);
     }
@@ -100,12 +101,12 @@ export class UserService {
     if (existingUser) throw new HttpError("User already exists", 409);
 
     const organizationId = user.organizationId;
-    if(!organizationId){
-      throw new HttpError('User must be attached to an organization.' , 400);
+    if (!organizationId) {
+      throw new HttpError('User must be attached to an organization.', 400);
     }
 
-    const organization = await prismaClient.organization.findUnique({where: {id: organizationId}})
-    if(!organization){
+    const organization = await prismaClient.organization.findUnique({ where: { id: organizationId } })
+    if (!organization) {
       throw new HttpError('Organization not found.');
     }
 
@@ -129,7 +130,7 @@ export class UserService {
     });
 
     // send email to user with password - TODO: implement email service
-    await emailService.sendInviteEmail(email, organization.name, password, )
+    await emailService.sendInviteEmail(email, organization.name, password,)
 
     return newUser;
   }
