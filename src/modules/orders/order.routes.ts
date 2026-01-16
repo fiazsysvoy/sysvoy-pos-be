@@ -6,6 +6,9 @@ const router = Router();
 // get all the orders
 router.get("/", orderController.getAllOrders);
 
+// get revenue statistics (must be before /:id route)
+router.get("/stats/revenue", orderController.getRevenueStats);
+
 // get order by id
 router.get("/:id", orderController.getOrderById);
 

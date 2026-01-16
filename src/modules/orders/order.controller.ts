@@ -158,3 +158,14 @@ export const returnOrderItems = asyncHandler(
     });
   }
 );
+
+export const getRevenueStats = asyncHandler(
+  async (req: Request, res: Response) => {
+    const stats = await orderService.getRevenueStats(req.user!);
+
+    res.json({
+      success: true,
+      data: stats,
+    });
+  }
+);

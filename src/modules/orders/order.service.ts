@@ -556,4 +556,217 @@ export class OrderService {
       },
     });
   }
+
+  async getRevenueStats(user: User) {
+    const organizationId = user.organizationId;
+    if (!organizationId) {
+      throw new HttpError("User does not belong to any organization", 400);
+    }
+
+    // Get start of today, this week, and this month
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    // Start of week (Monday)
+    const startOfWeek = new Date(now);
+    const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Convert Sunday (0) to 6 days back
+    startOfWeek.setDate(now.getDate() - daysToMonday);
+    startOfWeek.setHours(0, 0, 0, 0);
+    
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // Calculate revenue for each period (only COMPLETED orders)
+    const [todayRevenue, weekRevenue, monthRevenue, todayOrders, weekOrders, monthOrders] = await Promise.all([
+      // Today's revenue
+      prismaClient.order.aggregate({
+        where: {
+          organizationId,
+          status: "COMPLETED",
+          createdAt: {
+            gte: startOfToday,
+          },
+        },
+        _sum: {
+          totalAmount: true,
+        },
+      }),
+
+      // This week's revenue
+      prismaClient.order.aggregate({
+        where: {
+          organizationId,
+          status: "COMPLETED",
+          createdAt: {
+            gte: startOfWeek,
+          },
+        },
+        _sum: {
+          totalAmount: true,
+        },
+      }),
+
+      // This month's revenue
+      prismaClient.order.aggregate({
+        where: {
+          organizationId,
+          status: "COMPLETED",
+          createdAt: {
+            gte: startOfMonth,
+          },
+        },
+        _sum: {
+          totalAmount: true,
+        },
+      }),
+
+      // Today's hourly revenue (last 24 hours)
+      prismaClient.order.findMany({
+        where: {
+          organizationId,
+          status: "COMPLETED",
+          createdAt: {
+            gte: startOfToday,
+          },
+        },
+        select: {
+          totalAmount: true,
+          createdAt: true,
+        },
+        orderBy: {
+          createdAt: "asc",
+        },
+      }),
+
+      // This week's daily revenue (for week chart)
+      prismaClient.order.findMany({
+        where: {
+          organizationId,
+          status: "COMPLETED",
+          createdAt: {
+            gte: startOfWeek,
+          },
+        },
+        select: {
+          totalAmount: true,
+          createdAt: true,
+        },
+        orderBy: {
+          createdAt: "asc",
+        },
+      }),
+
+      // This month's daily revenue (for month chart)
+      prismaClient.order.findMany({
+        where: {
+          organizationId,
+          status: "COMPLETED",
+          createdAt: {
+            gte: startOfMonth,
+          },
+        },
+        select: {
+          totalAmount: true,
+          createdAt: true,
+        },
+        orderBy: {
+          createdAt: "asc",
+        },
+      }),
+    ]);
+
+    // Process today's hourly data (group by hour)
+    const hourlyRevenueMap = new Map<string, number>();
+    todayOrders.forEach((order) => {
+      const date = new Date(order.createdAt);
+      const hourKey = `${date.getHours()}:00`;
+      hourlyRevenueMap.set(
+        hourKey,
+        (hourlyRevenueMap.get(hourKey) || 0) + order.totalAmount
+      );
+    });
+
+    // Generate hourly data for today (last 12 hours, or all hours today if less than 12)
+    const todayHourlyData: Array<{ time: string; revenue: number }> = [];
+    const currentHour = now.getHours();
+    const hoursSinceMidnight = currentHour + 1;
+    const hoursToShow = Math.min(12, hoursSinceMidnight);
+    const startHour = Math.max(0, currentHour - hoursToShow + 1);
+    
+    for (let h = startHour; h <= currentHour; h++) {
+      const hourKey = `${String(h).padStart(2, '0')}:00`;
+      todayHourlyData.push({
+        time: hourKey,
+        revenue: hourlyRevenueMap.get(`${h}:00`) || 0,
+      });
+    }
+
+    // Process week's daily data
+    const weekDailyMap = new Map<string, number>();
+    weekOrders.forEach((order) => {
+      const dateKey = order.createdAt.toISOString().split("T")[0];
+      weekDailyMap.set(
+        dateKey,
+        (weekDailyMap.get(dateKey) || 0) + order.totalAmount
+      );
+    });
+
+    // Generate daily data for this week (Monday to today, inclusive)
+    const weekDailyData: Array<{ date: string; revenue: number }> = [];
+    // Calculate days from Monday to today (inclusive)
+    const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const mondayDate = new Date(startOfWeek.getFullYear(), startOfWeek.getMonth(), startOfWeek.getDate());
+    const daysSinceMonday = Math.floor((todayDate.getTime() - mondayDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const daysToShow = Math.min(7, daysSinceMonday);
+    
+    for (let i = 0; i < daysToShow; i++) {
+      const date = new Date(startOfWeek);
+      date.setDate(startOfWeek.getDate() + i);
+      date.setHours(0, 0, 0, 0); // Normalize to start of day
+      // Use local date components to avoid timezone issues
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const dateKey = `${year}-${month}-${day}`;
+      weekDailyData.push({
+        date: dateKey,
+        revenue: weekDailyMap.get(dateKey) || 0,
+      });
+    }
+
+    // Process month's data - group by week
+    const monthWeeklyMap = new Map<number, number>();
+    monthOrders.forEach((order) => {
+      const orderDate = new Date(order.createdAt);
+      // Calculate which week of the month (1-4)
+      const weekOfMonth = Math.ceil(orderDate.getDate() / 7);
+      const weekKey = Math.min(weekOfMonth, 4); // Cap at 4 weeks
+      monthWeeklyMap.set(
+        weekKey,
+        (monthWeeklyMap.get(weekKey) || 0) + order.totalAmount
+      );
+    });
+
+    // Generate weekly data for this month (W1, W2, W3, W4)
+    const monthDailyData: Array<{ date: string; revenue: number; week?: number }> = [];
+    const currentWeekOfMonth = Math.ceil(now.getDate() / 7);
+    const weeksToShow = Math.min(4, currentWeekOfMonth);
+    
+    for (let week = 1; week <= weeksToShow; week++) {
+      monthDailyData.push({
+        date: `W${week}`, // Week label
+        revenue: monthWeeklyMap.get(week) || 0,
+        week: week,
+      });
+    }
+
+    return {
+      today: todayRevenue._sum.totalAmount || 0,
+      thisWeek: weekRevenue._sum.totalAmount || 0,
+      thisMonth: monthRevenue._sum.totalAmount || 0,
+      todayData: todayHourlyData,
+      weekData: weekDailyData,
+      monthData: monthDailyData,
+    };
+  }
 }
