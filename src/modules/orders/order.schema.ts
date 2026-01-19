@@ -73,4 +73,6 @@ export const getOrdersQuerySchema = z.object({
     .optional()
     .transform((v) => (v ? parseInt(v) : 10))
     .refine((v) => v > 0 && v <= 100, "pageSize must be 1-100"),
+
+  search: z.string().optional(),
 });

@@ -1,5 +1,5 @@
 import { prismaClient } from "../../lib/prisma.js";
-import { Order, User } from "../../../generated/prisma/client.js";
+import { Order, User, Prisma as PrismaTypes } from "../../../generated/prisma/client.js";
 import { HttpError } from "../../utils/HttpError.js";
 import {
   CreateOrderData,
@@ -363,16 +363,69 @@ export class OrderService {
     pageIndex,
     pageSize,
     user,
+    search,
   }: {
     pageIndex: number;
     pageSize: number;
     user: User;
+    search?: string;
   }) {
     const skip = pageIndex * pageSize;
+    const organizationId = user.organizationId!;
+
+    const where: PrismaTypes.OrderWhereInput = {
+      organizationId,
+      ...(search && {
+        OR: [
+          {
+            name: {
+              contains: search,
+              mode: PrismaTypes.QueryMode.insensitive,
+            },
+          },
+          {
+            id: {
+              contains: search,
+              mode: PrismaTypes.QueryMode.insensitive,
+            },
+          },
+          {
+            createdBy: {
+              OR: [
+                {
+                  name: {
+                    contains: search,
+                    mode: PrismaTypes.QueryMode.insensitive,
+                  },
+                },
+                {
+                  email: {
+                    contains: search,
+                    mode: PrismaTypes.QueryMode.insensitive,
+                  },
+                },
+              ],
+            },
+          },
+          {
+            items: {
+              some: {
+                product: {
+                  name: {
+                    contains: search,
+                    mode: PrismaTypes.QueryMode.insensitive,
+                  },
+                },
+              },
+            },
+          },
+        ],
+      }),
+    };
 
     const [orders, total] = await Promise.all([
       prismaClient.order.findMany({
-        where: { organizationId: user.organizationId! },
+        where,
         skip,
         take: pageSize,
         orderBy: { createdAt: "desc" },
@@ -391,9 +444,7 @@ export class OrderService {
           },
         },
       }),
-      prismaClient.order.count({
-        where: { organizationId: user.organizationId! },
-      }),
+      prismaClient.order.count({ where }),
     ]);
 
     return {
