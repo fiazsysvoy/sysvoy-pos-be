@@ -23,6 +23,7 @@
     "@prisma/adapter-pg": "^7.2.0",
     "@prisma/client": "^7.2.0",
     "@types/express": "^5.0.6",
+    "@types/nodemailer-express-handlebars": "^4.0.6",
     "bcrypt": "^6.0.0",
     "cloudinary": "^2.8.0",
     "cors": "^2.8.5",

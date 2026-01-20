@@ -8,6 +8,108 @@ import {
 } from "./order.types.js";
 
 export class OrderService {
+  async createFromWebhook(organizationId: string, data: CreateOrderData & { source?: string }) {
+    const { items, name, source } = data;
+
+    // Validate products and calculate total
+    const productIds = items.map((item) => item.productId);
+    const products = await prismaClient.product.findMany({
+      where: {
+        id: { in: productIds },
+        organizationId, // Ensure products belong to the organization
+      },
+    });
+
+    if (products.length !== productIds.length) {
+      throw new HttpError("One or more products not found", 400);
+    }
+
+    // Check stock availability
+    for (const item of items) {
+      const product = products.find((p) => p.id === item.productId);
+      if (!product || product.stock < item.quantity) {
+        throw new HttpError(
+          `Insufficient stock for product: ${product?.name || item.productId}`,
+          400
+        );
+      }
+    }
+
+    let totalAmount = 0;
+    const orderItems: Array<{
+      productId: string;
+      quantity: number;
+      price: number;
+    }> = [];
+
+    // Calculate total and prepare order items
+    for (const item of items) {
+      const product = products.find((p) => p.id === item.productId);
+      if (product) {
+        const itemTotal = product.price * item.quantity;
+        totalAmount += itemTotal;
+        orderItems.push({
+          productId: item.productId,
+          quantity: item.quantity,
+          price: product.price,
+        });
+      }
+    }
+
+    // Create order with items in a transaction
+    const result = await prismaClient.$transaction(async (tx) => {
+      // Create order
+      const order = await tx.order.create({
+        data: {
+          totalAmount,
+          name: name || "Webhook Order",
+          source: source || "WEBHOOK",
+          status: "COMPLETED",
+          // createdBy is null for webhook orders
+          organization: {
+            connect: { id: organizationId },
+          },
+        },
+      });
+
+      // Create order items and update stock
+      for (const item of orderItems) {
+        await tx.orderItem.create({
+          data: {
+            orderId: order.id,
+            productId: item.productId,
+            quantity: item.quantity,
+            price: item.price,
+            organizationId: organizationId,
+          },
+        });
+
+        // Update product stock
+        await tx.product.update({
+          where: { id: item.productId },
+          data: {
+            stock: {
+              decrement: item.quantity,
+            },
+          },
+        });
+      }
+
+      return order;
+    });
+
+    return prismaClient.order.findUnique({
+      where: { id: result.id },
+      include: {
+        items: {
+          include: {
+            product: true,
+          },
+        },
+      },
+    });
+  }
+
   async create(user: User, data: CreateOrderData) {
     const { items, name } = data;
 
@@ -617,14 +719,14 @@ export class OrderService {
     // Get start of today, this week, and this month
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
+
     // Start of week (Monday)
     const startOfWeek = new Date(now);
     const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
     const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Convert Sunday (0) to 6 days back
     startOfWeek.setDate(now.getDate() - daysToMonday);
     startOfWeek.setHours(0, 0, 0, 0);
-    
+
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
     // Calculate revenue for each period (only COMPLETED orders)
@@ -743,7 +845,7 @@ export class OrderService {
     const hoursSinceMidnight = currentHour + 1;
     const hoursToShow = Math.min(12, hoursSinceMidnight);
     const startHour = Math.max(0, currentHour - hoursToShow + 1);
-    
+
     for (let h = startHour; h <= currentHour; h++) {
       const hourKey = `${String(h).padStart(2, '0')}:00`;
       todayHourlyData.push({
@@ -769,7 +871,7 @@ export class OrderService {
     const mondayDate = new Date(startOfWeek.getFullYear(), startOfWeek.getMonth(), startOfWeek.getDate());
     const daysSinceMonday = Math.floor((todayDate.getTime() - mondayDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
     const daysToShow = Math.min(7, daysSinceMonday);
-    
+
     for (let i = 0; i < daysToShow; i++) {
       const date = new Date(startOfWeek);
       date.setDate(startOfWeek.getDate() + i);
@@ -802,7 +904,7 @@ export class OrderService {
     const monthDailyData: Array<{ date: string; revenue: number; week?: number }> = [];
     const currentWeekOfMonth = Math.ceil(now.getDate() / 7);
     const weeksToShow = Math.min(4, currentWeekOfMonth);
-    
+
     for (let week = 1; week <= weeksToShow; week++) {
       monthDailyData.push({
         date: `W${week}`, // Week label
