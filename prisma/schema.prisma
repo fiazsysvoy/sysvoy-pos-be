@@ -16,7 +16,6 @@ datasource db {
 // Define enum for roles
 enum Role {
   ADMIN
-  OWNER
   STAFF
 }
 

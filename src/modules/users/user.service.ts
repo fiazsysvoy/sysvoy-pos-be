@@ -190,6 +190,23 @@ export class UserService {
       throw new HttpError("User not found", 404);
     }
 
+    if (user.role === "STAFF") {
+      throw new HttpError("Staff cannot delete users", 403);
+    }
+
+    if (existingUser.role === "ADMIN") {
+      // there must be another Admin in the organization
+      const adminCount = await prismaClient.user.count({
+        where: {
+          role: "ADMIN",
+          organizationId: user.organizationId,
+        },
+      });
+      if (adminCount < 2) {
+        throw new HttpError("There must be at least one admin in the organization", 400);
+      }
+    }
+
     await prismaClient.user.delete({
       where: { id, organizationId: user.organizationId },
     });

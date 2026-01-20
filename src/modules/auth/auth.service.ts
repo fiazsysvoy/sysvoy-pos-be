@@ -143,7 +143,7 @@ export class AuthService {
       await tx.user.update({
         where: { id: userId },
         data: {
-          role: "OWNER",
+          role: "ADMIN",
           status: "ACTIVE",
           organizationId: org.id,
         },
