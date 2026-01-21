@@ -6,7 +6,7 @@ export const signupSchema = z.object({
   password: z.string().min(6).max(100),
 });
 
-export const signinSchema =  z.object({
+export const signinSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
   password: z.string().min(6).max(100),
 });
@@ -37,3 +37,8 @@ export const resetPasswordSchema = z.object({
   token: z.string().min(1, "Reset token is required"),
   newPassword: z.string().min(6, "New password must be at least 6 characters"),
 });
+
+export const refreshTokenSchema = z.object({
+  refreshToken: z.string().min(1, "Refresh token is required"),
+});
+

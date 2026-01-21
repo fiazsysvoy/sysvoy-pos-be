@@ -9,6 +9,8 @@ import {
   forgotPassword,
   resetPassword,
   verifyResetToken,
+  refreshToken,
+  logout,
 } from "./auth.controller.js";
 import { requireAuth } from "../../middlewares/auth.middleware.js";
 
@@ -25,5 +27,8 @@ router.post("/change-password", requireAuth, changePassword);
 router.post("/forgot-password", forgotPassword);
 router.get("/verify-reset-token/:token", verifyResetToken);
 router.post("/reset-password", resetPassword);
+
+router.post("/refresh-token", refreshToken);
+router.post("/logout", requireAuth, logout);
 
 export default router;

@@ -3,8 +3,16 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { emailService } from "../../lib/email.js";
 import { HttpError } from "../../utils/HttpError.js";
+import crypto from "crypto";
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret";
+const ACCESS_TOKEN_EXPIRY = "15m";
+// 30 days expiry time for refresh token - calculated in seconds
+const REFRESH_TOKEN_EXPIRY = 30 * 24 * 60 * 60; // 30d
+
+// TODO: implement refresh token using jti method for fast lookup
+// TODO: implement refresh token rotation after every login
+// TODO: refresh token using http-only cookies
 
 export class AuthService {
   async signup(name: string, email: string, password: string) {
@@ -113,7 +121,7 @@ export class AuthService {
       },
       JWT_SECRET,
       {
-        expiresIn: "1y",
+        expiresIn: ACCESS_TOKEN_EXPIRY,
       },
     );
 
@@ -171,15 +179,20 @@ export class AuthService {
     //   throw new HttpError("please complete the signup process first.", 400);
     // }
 
-    const token = jwt.sign(
+    const accessToken = jwt.sign(
       { userId: user.id, role: user.role, organizationId: user.organizationId },
       JWT_SECRET,
       {
-        expiresIn: "1y",
+        expiresIn: ACCESS_TOKEN_EXPIRY,
       },
     );
+    const refreshToken = await this.generateRefreshToken(user.id);
 
-    return { token, status: user.status };
+    return {
+      accessToken,
+      refreshToken,
+      status: user.status,
+    };
   }
 
   async changePassword(userId: string, oldPass: string, newPass: string) {
@@ -253,5 +266,78 @@ export class AuthService {
     });
 
     return { message: "Password reset successfully" };
+  }
+
+  async refreshAccessToken(refreshToken: string) {
+    // TODO: update refresh token using jti method for fast lookup
+
+    // Find user with non-expired refresh token
+    const users = await prismaClient.user.findMany({
+      where: {
+        refreshTokenExpiresAt: { gt: new Date() },
+      },
+    });
+
+    // Find matching user by comparing hashed tokens
+    let matchedUser = null;
+    for (const user of users) {
+      if (user.refreshToken) {
+        const isValid = await bcrypt.compare(refreshToken, user.refreshToken);
+        if (isValid) {
+          matchedUser = user;
+          break;
+        }
+      }
+    }
+
+    if (!matchedUser) {
+      throw new HttpError("Invalid or expired refresh token", 401);
+    }
+
+    // Generate new access token
+    const accessToken = jwt.sign(
+      {
+        userId: matchedUser.id,
+        role: matchedUser.role,
+        organizationId: matchedUser.organizationId,
+      },
+      JWT_SECRET,
+      {
+        expiresIn: ACCESS_TOKEN_EXPIRY,
+      },
+    );
+
+    return { accessToken };
+  }
+
+  async generateRefreshToken(userId: string) {
+    const user = await prismaClient.user.findUnique({ where: { id: userId } });
+    if (!user) throw new HttpError("User not found", 404);
+
+    const refreshToken = crypto.randomBytes(64).toString("hex");
+    const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
+    const refreshTokenExpiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRY * 1000); // 30 days
+
+    await prismaClient.user.update({
+      where: { id: userId },
+      data: {
+        refreshToken: hashedRefreshToken,
+        refreshTokenExpiresAt,
+      },
+    });
+
+    return refreshToken;
+  }
+
+  async logout(userId: string) {
+    await prismaClient.user.update({
+      where: { id: userId },
+      data: {
+        refreshToken: null,
+        refreshTokenExpiresAt: null,
+      },
+    });
+
+    return { message: "Logged out successfully" };
   }
 }

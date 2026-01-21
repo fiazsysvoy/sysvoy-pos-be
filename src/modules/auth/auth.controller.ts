@@ -8,6 +8,7 @@ import {
   changePasswordSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  refreshTokenSchema,
 } from "./auth.schema.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 
@@ -37,8 +38,9 @@ export const verifyEmail = asyncHandler(async (req, res) => {
   }
   const { email, code } = parsed.data;
   const user = await authService.verifyEmail(email, code);
-  const token = await authService.generateJwt(user.id);
-  res.json({ message: "Email verified successfully", user, token });
+  const accessToken = await authService.generateJwt(user.id);
+  const refreshToken = await authService.generateRefreshToken(user.id);
+  res.json({ message: "Email verified successfully", user, accessToken, refreshToken });
 });
 
 export const resendVerification = asyncHandler(async (req, res) => {
@@ -126,3 +128,22 @@ export const resetPassword = asyncHandler(async (req, res) => {
   );
   res.json(result);
 });
+
+export const refreshToken = asyncHandler(async (req, res) => {
+  const parsed = refreshTokenSchema.safeParse(req.body);
+  if (!parsed.success)
+    return res
+      .status(400)
+      .json({ errors: parsed.error.issues.map((i) => i.message) });
+
+  const result = await authService.refreshAccessToken(parsed.data.refreshToken);
+  res.json(result);
+});
+
+export const logout = asyncHandler(async (req, res) => {
+  const userId = (req as any).user?.id;
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+  const result = await authService.logout(userId);
+  res.json(result);
+});
+
