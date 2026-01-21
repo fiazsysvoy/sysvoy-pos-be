@@ -67,6 +67,7 @@ model Organization {
   returns     Return[]
   orderItems OrderItem[] @relation("OrgOrderItems")
   returnItems ReturnItem[] @relation("OrgReturnItems")
+  productMappings ProductMapping[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -109,6 +110,7 @@ model Product {
   organizationId String
 
   orderItems  OrderItem[]
+  productMappings ProductMapping[]
 
   @@index([organizationId, name])
   @@index([categoryId, organizationId])
@@ -144,11 +146,13 @@ model Order {
   organizationId String
 
   source String @default("POS")
+  externalOrderId String?
 
   @@index([createdAt])
   @@index([createdById])
   @@index([organizationId])
   @@unique([id, organizationId])
+  @@unique([externalOrderId, source, organizationId])
 }
 
 model OrderItem {
@@ -210,4 +214,22 @@ model ReturnItem {
 
   @@index([returnId])
   @@index([orderItemId])
+}
+
+model ProductMapping {
+  id                String   @id @default(uuid())
+  externalProductId String   // Product ID from external system
+  source            String   // e.g., "Foodpanda", "UberEats"
+  
+  product           Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId         String
+  
+  organization      Organization @relation(fields: [organizationId], references: [id])
+  organizationId    String
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@unique([externalProductId, source, organizationId])
+  @@index([organizationId])
 }

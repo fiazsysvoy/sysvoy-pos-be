@@ -169,6 +169,19 @@ export class UserService {
         data.password = await bcrypt.hash(data.password, 10);
       }
 
+      // if status is not admin, must be another admin
+      if (data.role !== "ADMIN" && existingUser.role === "ADMIN") {
+        const adminCount = await tx.user.count({
+          where: {
+            role: "ADMIN",
+            organizationId,
+          },
+        });
+        if (adminCount < 2) {
+          throw new HttpError("There must be at least one admin in the organization", 400);
+        }
+      }
+
       // Update user
       return tx.user.update({
         where: { id },

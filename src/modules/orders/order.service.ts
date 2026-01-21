@@ -8,8 +8,8 @@ import {
 } from "./order.types.js";
 
 export class OrderService {
-  async createFromWebhook(organizationId: string, data: CreateOrderData & { source?: string }) {
-    const { items, name, source } = data;
+  async createFromWebhook(organizationId: string, data: CreateOrderData & { source?: string; externalOrderId?: string }) {
+    const { items, name, source, externalOrderId } = data;
 
     // Validate products and calculate total
     const productIds = items.map((item) => item.productId);
@@ -65,7 +65,7 @@ export class OrderService {
           name: name || "Webhook Order",
           source: source || "WEBHOOK",
           status: "COMPLETED",
-          // createdBy is null for webhook orders
+          externalOrderId: externalOrderId || undefined,
           organization: {
             connect: { id: organizationId },
           },
@@ -107,6 +107,62 @@ export class OrderService {
           },
         },
       },
+    });
+  }
+
+  async cancelExternalOrder(
+    externalOrderId: string,
+    source: string,
+    organizationId: string
+  ) {
+    return prismaClient.$transaction(async (tx) => {
+      // Find the order by externalOrderId and source
+      const order = await tx.order.findFirst({
+        where: {
+          externalOrderId,
+          source,
+          organizationId,
+        },
+        include: { items: true },
+      });
+
+      if (!order) {
+        throw new HttpError(
+          `Order not found with externalOrderId: ${externalOrderId}`,
+          404
+        );
+      }
+
+      // Check if already cancelled
+      if (order.status === "CANCELLED") {
+        throw new HttpError("Order is already cancelled", 400);
+      }
+
+      // Restock items
+      for (const item of order.items) {
+        await tx.product.update({
+          where: { id: item.productId },
+          data: {
+            stock: {
+              increment: item.quantity,
+            },
+          },
+        });
+      }
+
+      // Update order status
+      return tx.order.update({
+        where: { id: order.id },
+        data: {
+          status: "CANCELLED",
+          cancelledAt: new Date(),
+        },
+        include: {
+          items: {
+            include: { product: true },
+          },
+        },
+      });
     });
   }
 
