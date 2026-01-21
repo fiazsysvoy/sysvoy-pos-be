@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { requireAuth } from "./middlewares/auth.middleware.js";
+import { requireAdmin, requireAuth } from "./middlewares/auth.middleware.js";
 import authRouter from "./modules/auth/auth.routes.js";
 import categoryRoutes from "./modules/categories/category.routes.js";
 import userRouter from "./modules/users/user.routes.js";
@@ -7,6 +7,8 @@ import accountRouter from "./modules/account/account.routes.js";
 import productRouter from "./modules/product/product.routes.js";
 import orderRouter from "./modules/orders/order.routes.js";
 import webhookRouter from "./modules/webhooks/webhook.routes.js";
+import integrationRouter from "./modules/integration/integration.routes.js";
+import teamIntegrationRouter from "./modules/team-integration/team-integration.routes.js";
 
 const router = Router();
 
@@ -27,6 +29,12 @@ router.use("/products", requireAuth, productRouter);
 
 // order routes
 router.use("/orders", requireAuth, orderRouter);
+
+// Integration routes
+router.use("/integrations", requireAdmin, integrationRouter);
+
+// Team Integration routes
+router.use("/team-integrations", requireAuth, teamIntegrationRouter);
 
 // Webhook routes (no global auth, uses custom secret guard)
 router.use("/webhooks", webhookRouter);

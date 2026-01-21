@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { verifyJwt } from "../modules/auth/jwt.utils.js";
 import { prismaClient } from "../lib/prisma.js";
 import { User } from "../../generated/prisma/client.js";
+import { AdminToken } from "../server.js";
 
 interface AuthRequest extends Request {
   user?: User; // user will be attached after authentication
@@ -45,10 +46,18 @@ export const requireAdmin = (
   res: Response,
   next: NextFunction,
 ) => {
-  requireAuth(req, res, async () => {
-    if (req.user?.role !== "ADMIN") {
-      return res.status(403).json({ message: "Forbidden: Admins only" });
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ message: "Unauthorized" });
     }
+
+    const token = authHeader.split(" ")[1];
+
+    if (!token || token !== AdminToken) return res.status(404).json({ message: "User not found" });
+
     next();
-  });
+  } catch (err: any) {
+    res.status(403).json({ message: "Unauthorized" });
+  }
 };

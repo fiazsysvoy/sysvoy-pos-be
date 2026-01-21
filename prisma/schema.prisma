@@ -19,7 +19,7 @@ enum Role {
   STAFF
 }
 
-enum AccountStatus{
+enum AccountStatus {
   UNVERIFIED_EMAIL
   ORG_UNATTACHED
   ACTIVE
@@ -28,55 +28,56 @@ enum AccountStatus{
 
 // User model
 model User {
-  id             String        @id @default(uuid())
-  email          String        @unique
-  password       String
-  name           String?
-  role           Role          @default(STAFF)
-  status           AccountStatus          @default(UNVERIFIED_EMAIL)
+  id       String        @id @default(uuid())
+  email    String        @unique
+  password String
+  name     String?
+  role     Role          @default(STAFF)
+  status   AccountStatus @default(UNVERIFIED_EMAIL)
 
-  organization   Organization?  @relation("OrganizationUsers", fields: [organizationId], references: [id])
+  organization   Organization? @relation("OrganizationUsers", fields: [organizationId], references: [id])
   organizationId String?
 
-  orders Order[] @relation("UserOrders")
-  returns Return[] @relation("UserReturns")
+  orders               Order[]        @relation("UserOrders")
+  returns              Return[]       @relation("UserReturns")
   createdOrganizations Organization[] @relation("OrganizationCreator")
 
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  deletedAt      DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-  verificationCode String?
+  verificationCode          String?
   verificationCodeExpiresAt DateTime?
 
-  passwordResetToken String?
+  passwordResetToken     String?
   passwordResetExpiresAt DateTime?
 
-  refreshToken String?
+  refreshToken          String?
   refreshTokenExpiresAt DateTime?
 }
 
 model Organization {
-  id          String   @id @default(uuid())
-  name        String
+  id   String @id @default(uuid())
+  name String
 
   createdById String?
-  createdBy   User?    @relation("OrganizationCreator", fields: [createdById], references: [id])
+  createdBy   User?   @relation("OrganizationCreator", fields: [createdById], references: [id])
 
-  users       User[]   @relation("OrganizationUsers")
-  categories  Category[]
-  products    Product[]
-  orders      Order[]
-  returns     Return[]
-  orderItems OrderItem[] @relation("OrgOrderItems")
-  returnItems ReturnItem[] @relation("OrgReturnItems")
+  users           User[]           @relation("OrganizationUsers")
+  categories      Category[]
+  products        Product[]
+  orders          Order[]
+  returns         Return[]
+  orderItems      OrderItem[]      @relation("OrgOrderItems")
+  returnItems     ReturnItem[]     @relation("OrgReturnItems")
   productMappings ProductMapping[]
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  deletedAt   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-  clientSecret String? @unique @default(uuid())
+  clientSecret     String?           @unique @default(uuid())
+  integrationTeams IntegrationTeam[]
 }
 
 model Category {
@@ -88,8 +89,8 @@ model Category {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  products      Product[]
-  organization   Organization  @relation(fields: [organizationId], references: [id])
+  products       Product[]
+  organization   Organization @relation(fields: [organizationId], references: [id])
   organizationId String
 
   @@unique([name, organizationId])
@@ -109,16 +110,15 @@ model Product {
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   categoryId String
 
-  organization   Organization  @relation(fields: [organizationId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id])
   organizationId String
 
-  orderItems  OrderItem[]
+  orderItems      OrderItem[]
   productMappings ProductMapping[]
 
+  @@unique([id, organizationId])
   @@index([organizationId, name])
   @@index([categoryId, organizationId])
-  
-  @@unique([id, organizationId])
 }
 
 enum OrderStatus {
@@ -128,34 +128,34 @@ enum OrderStatus {
 }
 
 model Order {
-  id          String   @id @default(uuid())
-  name String @default("Order")
+  id          String      @id @default(uuid())
+  name        String      @default("Order")
   totalAmount Float
-  status OrderStatus @default(IN_PROCESS)
+  status      OrderStatus @default(IN_PROCESS)
 
-  createdAt   DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  completedAt  DateTime?
-  cancelledAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
+  cancelledAt DateTime?
 
   items OrderItem[]
 
-  createdBy   User? @relation("UserOrders", fields: [createdById], references: [id])
+  createdBy   User?   @relation("UserOrders", fields: [createdById], references: [id])
   createdById String?
 
   returns Return[]
 
-  organization   Organization  @relation(fields: [organizationId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id])
   organizationId String
 
-  source String @default("POS")
+  source          String  @default("POS")
   externalOrderId String?
 
+  @@unique([id, organizationId])
+  @@unique([externalOrderId, source, organizationId])
   @@index([createdAt])
   @@index([createdById])
   @@index([organizationId])
-  @@unique([id, organizationId])
-  @@unique([externalOrderId, source, organizationId])
 }
 
 model OrderItem {
@@ -184,17 +184,17 @@ model Return {
   id        String   @id @default(uuid())
   createdAt DateTime @default(now())
 
-  order Order @relation( fields: [orderId, organizationId], references: [id, organizationId])
+  order   Order  @relation(fields: [orderId, organizationId], references: [id, organizationId])
   orderId String
 
   items ReturnItem[]
 
   refundedAmount Float
 
-  createdBy   User? @relation("UserReturns", fields: [createdById], references: [id])
+  createdBy   User?   @relation("UserReturns", fields: [createdById], references: [id])
   createdById String?
 
-  organization   Organization  @relation(fields: [organizationId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id])
   organizationId String
 
   @@index([orderId])
@@ -220,19 +220,44 @@ model ReturnItem {
 }
 
 model ProductMapping {
-  id                String   @id @default(uuid())
-  externalProductId String   // Product ID from external system
-  source            String   // e.g., "Foodpanda", "UberEats"
-  
-  product           Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  productId         String
-  
-  organization      Organization @relation(fields: [organizationId], references: [id])
-  organizationId    String
-  
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  
+  id                String @id @default(uuid())
+  externalProductId String // Product ID from external system
+  source            String // e.g., "Foodpanda", "UberEats"
+
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId String
+
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  organizationId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@unique([externalProductId, source, organizationId])
   @@index([organizationId])
+}
+
+model Integration {
+  id    String  @id @default(uuid())
+  name  String
+  image String?
+
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  integrationTeams IntegrationTeam[]
+}
+
+model IntegrationTeam {
+  id String @id @default(uuid())
+
+  integration   Integration @relation(fields: [integrationId], references: [id])
+  integrationId String
+
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  organizationId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([integrationId, organizationId])
 }
