@@ -127,11 +127,32 @@ enum OrderStatus {
   CANCELLED
 }
 
+enum PaymentMethod {
+  CASH
+  JAZZCASH
+  EASYPAISA
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
 model Order {
   id          String      @id @default(uuid())
   name        String      @default("Order")
   totalAmount Float
   status      OrderStatus @default(IN_PROCESS)
+
+  // Payment fields
+  paymentMethod PaymentMethod? @default(CASH)
+  paymentStatus PaymentStatus? @default(PENDING)
+  transactionId String? // Transaction ID from payment gateway
+  paymentGatewayResponse Json? // Store full response from gateway
+  paidAt DateTime? // When payment was completed
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -156,6 +177,9 @@ model Order {
   @@index([createdAt])
   @@index([createdById])
   @@index([organizationId])
+  @@index([paymentStatus])
+  @@index([transactionId])
+  @@unique([id, organizationId])
 }
 
 model OrderItem {

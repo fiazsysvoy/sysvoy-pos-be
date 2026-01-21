@@ -15,6 +15,8 @@ export const createOrderSchema = z.object({
     .array(orderItemSchema)
     .min(1, "Order must contain at least one item"),
   name: z.string("Order must have a name").optional(),
+  paymentMethod: z.enum(["CASH", "JAZZCASH", "EASYPAISA"]).optional(),
+  customerPhone: z.string().optional(),
 });
 
 export const updateOrderSchema = z.object({

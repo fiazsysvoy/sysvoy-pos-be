@@ -6,6 +6,8 @@ import userRouter from "./modules/users/user.routes.js";
 import accountRouter from "./modules/account/account.routes.js";
 import productRouter from "./modules/product/product.routes.js";
 import orderRouter from "./modules/orders/order.routes.js";
+import paymentRouter from "./modules/payments/payment.routes.js";
+import * as paymentController from "./modules/payments/payment.controller.js";
 import webhookRouter from "./modules/webhooks/webhook.routes.js";
 import integrationRouter from "./modules/integration/integration.routes.js";
 import teamIntegrationRouter from "./modules/team-integration/team-integration.routes.js";
@@ -29,6 +31,12 @@ router.use("/products", requireAuth, productRouter);
 
 // order routes
 router.use("/orders", requireAuth, orderRouter);
+
+// Payment callback (public endpoint for gateways)
+router.post("/payments/callback", paymentController.paymentCallback);
+
+// Payment routes (protected)
+router.use("/payments", requireAuth, paymentRouter);
 
 // Integration routes
 router.use("/integrations", requireAdmin, integrationRouter);

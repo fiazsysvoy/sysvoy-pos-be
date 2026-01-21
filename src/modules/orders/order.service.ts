@@ -167,7 +167,7 @@ export class OrderService {
   }
 
   async create(user: User, data: CreateOrderData) {
-    const { items, name } = data;
+    const { items, name, paymentMethod } = data;
 
     // Validate products and calculate total
     const productIds = items.map((item) => item.productId);
@@ -218,6 +218,8 @@ export class OrderService {
         data: {
           totalAmount,
           name: name || "Order",
+          paymentMethod: paymentMethod || "CASH",
+          paymentStatus: paymentMethod === "CASH" ? "PENDING" : "PENDING",
           createdBy: {
             connect: { id: user.id },
           },
@@ -328,6 +330,14 @@ export class OrderService {
       }
 
       if (data.status === "COMPLETED") {
+        // Payment must be completed before order can be completed
+        if (order.paymentStatus !== "COMPLETED") {
+          throw new HttpError(
+            `Order cannot be completed. Payment must be completed first. Current payment status: ${order.paymentStatus || "PENDING"}`,
+            400
+          );
+        }
+
         return tx.order.update({
           where: { id_organizationId: { id: orderId, organizationId } },
           data: {
