@@ -896,6 +896,7 @@ export class OrderService {
 
     // Process today's hourly data (group by hour)
     const hourlyRevenueMap = new Map<string, number>();
+    const hourlySalesMap = new Map<string, number>();
     todayOrders.forEach((order) => {
       const date = new Date(order.createdAt);
       const hourKey = `${date.getHours()}:00`;
@@ -903,10 +904,14 @@ export class OrderService {
         hourKey,
         (hourlyRevenueMap.get(hourKey) || 0) + order.totalAmount
       );
+      hourlySalesMap.set(
+        hourKey,
+        (hourlySalesMap.get(hourKey) || 0) + 1
+      );
     });
 
     // Generate hourly data for today (last 12 hours, or all hours today if less than 12)
-    const todayHourlyData: Array<{ time: string; revenue: number }> = [];
+    const todayHourlyData: Array<{ time: string; revenue: number; sales: number }> = [];
     const currentHour = now.getHours();
     const hoursSinceMidnight = currentHour + 1;
     const hoursToShow = Math.min(12, hoursSinceMidnight);
@@ -917,21 +922,27 @@ export class OrderService {
       todayHourlyData.push({
         time: hourKey,
         revenue: hourlyRevenueMap.get(`${h}:00`) || 0,
+        sales: hourlySalesMap.get(`${h}:00`) || 0,
       });
     }
 
     // Process week's daily data
-    const weekDailyMap = new Map<string, number>();
+    const weekDailyRevenueMap = new Map<string, number>();
+    const weekDailySalesMap = new Map<string, number>();
     weekOrders.forEach((order) => {
       const dateKey = order.createdAt.toISOString().split("T")[0];
-      weekDailyMap.set(
+      weekDailyRevenueMap.set(
         dateKey,
-        (weekDailyMap.get(dateKey) || 0) + order.totalAmount
+        (weekDailyRevenueMap.get(dateKey) || 0) + order.totalAmount
+      );
+      weekDailySalesMap.set(
+        dateKey,
+        (weekDailySalesMap.get(dateKey) || 0) + 1
       );
     });
 
     // Generate daily data for this week (Monday to today, inclusive)
-    const weekDailyData: Array<{ date: string; revenue: number }> = [];
+    const weekDailyData: Array<{ date: string; revenue: number; sales: number }> = [];
     // Calculate days from Monday to today (inclusive)
     const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const mondayDate = new Date(startOfWeek.getFullYear(), startOfWeek.getMonth(), startOfWeek.getDate());
@@ -949,33 +960,84 @@ export class OrderService {
       const dateKey = `${year}-${month}-${day}`;
       weekDailyData.push({
         date: dateKey,
-        revenue: weekDailyMap.get(dateKey) || 0,
+        revenue: weekDailyRevenueMap.get(dateKey) || 0,
+        sales: weekDailySalesMap.get(dateKey) || 0,
       });
     }
 
     // Process month's data - group by week
-    const monthWeeklyMap = new Map<number, number>();
+    const monthWeeklyRevenueMap = new Map<number, number>();
+    const monthWeeklySalesMap = new Map<number, number>();
     monthOrders.forEach((order) => {
       const orderDate = new Date(order.createdAt);
       // Calculate which week of the month (1-4)
       const weekOfMonth = Math.ceil(orderDate.getDate() / 7);
       const weekKey = Math.min(weekOfMonth, 4); // Cap at 4 weeks
-      monthWeeklyMap.set(
+      monthWeeklyRevenueMap.set(
         weekKey,
-        (monthWeeklyMap.get(weekKey) || 0) + order.totalAmount
+        (monthWeeklyRevenueMap.get(weekKey) || 0) + order.totalAmount
+      );
+      monthWeeklySalesMap.set(
+        weekKey,
+        (monthWeeklySalesMap.get(weekKey) || 0) + 1
       );
     });
 
     // Generate weekly data for this month (W1, W2, W3, W4)
-    const monthDailyData: Array<{ date: string; revenue: number; week?: number }> = [];
+    const monthDailyData: Array<{ date: string; revenue: number; sales: number; week?: number }> = [];
     const currentWeekOfMonth = Math.ceil(now.getDate() / 7);
     const weeksToShow = Math.min(4, currentWeekOfMonth);
 
     for (let week = 1; week <= weeksToShow; week++) {
       monthDailyData.push({
         date: `W${week}`, // Week label
-        revenue: monthWeeklyMap.get(week) || 0,
+        revenue: monthWeeklyRevenueMap.get(week) || 0,
+        sales: monthWeeklySalesMap.get(week) || 0,
         week: week,
+      });
+    }
+
+    // Get historical monthly data for overview chart (last 12 months)
+    const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+    const historicalOrders = await prismaClient.order.findMany({
+      where: {
+        organizationId,
+        status: "COMPLETED",
+        createdAt: {
+          gte: twelveMonthsAgo,
+        },
+      },
+      select: {
+        totalAmount: true,
+        createdAt: true,
+      },
+    });
+
+    // Group orders by month
+    const monthlyMap = new Map<string, { revenue: number; sales: number }>();
+    historicalOrders.forEach((order) => {
+      const orderDate = new Date(order.createdAt);
+      const monthKey = `${orderDate.getFullYear()}-${orderDate.getMonth()}`;
+      const existing = monthlyMap.get(monthKey) || { revenue: 0, sales: 0 };
+      monthlyMap.set(monthKey, {
+        revenue: existing.revenue + order.totalAmount,
+        sales: existing.sales + 1,
+      });
+    });
+
+    // Generate data for last 12 months
+    const monthNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+    const historicalMonthlyData: Array<{ month: string; revenue: number; sales: number }> = [];
+    
+    for (let i = 11; i >= 0; i--) {
+      const targetDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthKey = `${targetDate.getFullYear()}-${targetDate.getMonth()}`;
+      const monthData = monthlyMap.get(monthKey) || { revenue: 0, sales: 0 };
+      
+      historicalMonthlyData.push({
+        month: monthNames[targetDate.getMonth()],
+        revenue: monthData.revenue,
+        sales: monthData.sales,
       });
     }
 
@@ -986,6 +1048,7 @@ export class OrderService {
       todayData: todayHourlyData,
       weekData: weekDailyData,
       monthData: monthDailyData,
+      historicalMonthlyData: historicalMonthlyData,
     };
   }
 }
