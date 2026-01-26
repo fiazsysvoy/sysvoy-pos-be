@@ -11,6 +11,7 @@ import * as paymentController from "./modules/payments/payment.controller.js";
 import webhookRouter from "./modules/webhooks/webhook.routes.js";
 import integrationRouter from "./modules/integration/integration.routes.js";
 import teamIntegrationRouter from "./modules/team-integration/team-integration.routes.js";
+import financialRouter from "./modules/financial/financial.routes.js";
 
 const router = Router();
 
@@ -46,5 +47,8 @@ router.use("/team-integrations", requireAuth, teamIntegrationRouter);
 
 // Webhook routes (no global auth, uses custom secret guard)
 router.use("/webhooks", webhookRouter);
+
+// Financial routes
+router.use("/financial", requireAuth, financialRouter);
 
 export default router;

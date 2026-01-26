@@ -6,7 +6,7 @@ import { HttpError } from "../../utils/HttpError.js";
 import crypto from "crypto";
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret";
-const ACCESS_TOKEN_EXPIRY = "15m";
+const ACCESS_TOKEN_EXPIRY = "15s"; // Short-lived for security
 // 30 days expiry time for refresh token - calculated in seconds
 const REFRESH_TOKEN_EXPIRY = 30 * 24 * 60 * 60; // 30d
 
