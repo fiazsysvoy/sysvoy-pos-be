@@ -10,6 +10,8 @@ export const createProductSchema = z.object({
 
   price: z.preprocess((val) => Number(val), z.number().min(0)),
 
+  cost: z.preprocess((val) => Number(val), z.number().min(0)),
+
   stock: z.preprocess(
     (val) => (val === undefined ? 0 : Number(val)),
     z.number().int().min(0),
@@ -26,6 +28,13 @@ export const updateProductSchema = z.object({
   description: z.string().optional(),
 
   price: z
+    .preprocess(
+      (val) => (val === undefined ? undefined : Number(val)),
+      z.number().min(0),
+    )
+    .optional(),
+
+  cost: z
     .preprocess(
       (val) => (val === undefined ? undefined : Number(val)),
       z.number().min(0),

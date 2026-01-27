@@ -150,6 +150,9 @@ export class ProductService {
       updateData.name = data.name;
       updateData.description = data.description;
       updateData.price = data.price;
+      if (data.cost !== undefined) {
+        updateData.cost = data.cost;
+      }
       updateData.stock = data.stock;
       if (data.categoryId && data.categoryId !== product.categoryId) {
         updateData.category = {

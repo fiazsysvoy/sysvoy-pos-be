@@ -101,6 +101,7 @@ model Product {
   name        String
   description String?
   price       Float
+  cost        Float    @default(0) // Cost/purchase price for profit calculation (required)
   stock       Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

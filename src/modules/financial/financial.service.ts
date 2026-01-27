@@ -13,7 +13,14 @@ export class FinancialService {
       throw new HttpError("User does not belong to any organization", 400);
     }
 
-    const { fromDate, toDate, groupBy, paymentMethod, orderStatus, includeRefunds } = query;
+    const {
+      fromDate,
+      toDate,
+      groupBy,
+      paymentMethod,
+      orderStatus,
+      includeRefunds,
+    } = query;
 
     // Build base where clause
     const baseWhere: any = {
@@ -67,10 +74,18 @@ export class FinancialService {
     const completedOrders = orders.filter((o) => o.status === "COMPLETED");
     const cancelledOrders = orders.filter((o) => o.status === "CANCELLED");
     const inProcessOrders = orders.filter((o) => o.status === "IN_PROCESS");
-
-    const totalRevenue = completedOrders.reduce((sum, o) => sum + o.totalAmount, 0);
-    const cancelledRevenue = cancelledOrders.reduce((sum, o) => sum + o.totalAmount, 0);
-    const inProcessRevenue = inProcessOrders.reduce((sum, o) => sum + o.totalAmount, 0);
+    const totalRevenue = completedOrders.reduce(
+      (sum, o) => sum + o.totalAmount,
+      0,
+    );
+    const cancelledRevenue = cancelledOrders.reduce(
+      (sum, o) => sum + o.totalAmount,
+      0,
+    );
+    const inProcessRevenue = inProcessOrders.reduce(
+      (sum, o) => sum + o.totalAmount,
+      0,
+    );
 
     // Calculate refunds
     let totalRefunds = 0;
@@ -91,7 +106,8 @@ export class FinancialService {
 
     const netRevenue = totalRevenue - totalRefunds;
     const totalOrders = orders.length;
-    const averageOrderValue = totalOrders > 0 ? totalRevenue / completedOrders.length : 0;
+    const averageOrderValue =
+      totalOrders > 0 ? totalRevenue / completedOrders.length : 0;
 
     // Payment method breakdown
     const paymentMethodBreakdown = {
@@ -102,9 +118,15 @@ export class FinancialService {
 
     completedOrders.forEach((order) => {
       const method = order.paymentMethod || "CASH";
-      if (paymentMethodBreakdown[method as keyof typeof paymentMethodBreakdown]) {
-        paymentMethodBreakdown[method as keyof typeof paymentMethodBreakdown].revenue += order.totalAmount;
-        paymentMethodBreakdown[method as keyof typeof paymentMethodBreakdown].orders += 1;
+      if (
+        paymentMethodBreakdown[method as keyof typeof paymentMethodBreakdown]
+      ) {
+        paymentMethodBreakdown[
+          method as keyof typeof paymentMethodBreakdown
+        ].revenue += order.totalAmount;
+        paymentMethodBreakdown[
+          method as keyof typeof paymentMethodBreakdown
+        ].orders += 1;
       }
     });
 
@@ -112,7 +134,9 @@ export class FinancialService {
     Object.keys(paymentMethodBreakdown).forEach((method) => {
       const key = method as keyof typeof paymentMethodBreakdown;
       paymentMethodBreakdown[key].percentage =
-        totalRevenue > 0 ? (paymentMethodBreakdown[key].revenue / totalRevenue) * 100 : 0;
+        totalRevenue > 0
+          ? (paymentMethodBreakdown[key].revenue / totalRevenue) * 100
+          : 0;
     });
 
     // Status breakdown for donut chart (similar to the image)
@@ -120,25 +144,77 @@ export class FinancialService {
       COMPLETED: {
         revenue: totalRevenue,
         orders: completedOrders.length,
-        percentage: totalOrders > 0 ? (completedOrders.length / totalOrders) * 100 : 0,
+        percentage:
+          totalOrders > 0 ? (completedOrders.length / totalOrders) * 100 : 0,
       },
       CANCELLED: {
         revenue: cancelledRevenue,
         orders: cancelledOrders.length,
-        percentage: totalOrders > 0 ? (cancelledOrders.length / totalOrders) * 100 : 0,
+        percentage:
+          totalOrders > 0 ? (cancelledOrders.length / totalOrders) * 100 : 0,
       },
       IN_PROCESS: {
         revenue: inProcessRevenue,
         orders: inProcessOrders.length,
-        percentage: totalOrders > 0 ? (inProcessOrders.length / totalOrders) * 100 : 0,
+        percentage:
+          totalOrders > 0 ? (inProcessOrders.length / totalOrders) * 100 : 0,
       },
     };
 
     // Generate time series data based on groupBy
-    const timeSeriesData = this.generateTimeSeriesData(orders, fromDate, toDate, groupBy);
+    const timeSeriesData = this.generateTimeSeriesData(
+      orders,
+      fromDate,
+      toDate,
+      groupBy,
+    );
 
-    // Get top products by revenue
-    const productRevenueMap = new Map<string, { name: string; revenue: number; quantity: number; category: string }>();
+    // Get all unique product IDs from completed orders to fetch costs
+    const allProductIds = new Set<string>();
+    completedOrders.forEach((order) => {
+      order.items.forEach((item) => {
+        allProductIds.add(item.productId);
+      });
+    });
+
+    // Fetch product costs from database
+    const productsWithCosts = await prismaClient.product.findMany({
+      where: {
+        id: { in: Array.from(allProductIds) },
+        organizationId,
+      },
+      select: {
+        id: true,
+        cost: true,
+      },
+    });
+
+    // Create a map for quick cost lookup
+    const productCostMap = new Map<string, number>();
+    productsWithCosts.forEach((product) => {
+      productCostMap.set(product.id, product.cost || 0);
+    });
+
+    // Calculate total costs for all completed orders
+    let totalCosts = 0;
+    completedOrders.forEach((order) => {
+      order.items.forEach((item) => {
+        const productCost = productCostMap.get(item.productId) || 0;
+        totalCosts += productCost * item.quantity;
+      });
+    });
+
+    // Get top products by revenue with cost data for profit calculation
+    const productRevenueMap = new Map<
+      string,
+      {
+        name: string;
+        revenue: number;
+        quantity: number;
+        category: string;
+        cost: number; // Store cost for profit calculation
+      }
+    >();
 
     completedOrders.forEach((order) => {
       order.items.forEach((item) => {
@@ -146,12 +222,14 @@ export class FinancialService {
         const productName = item.product.name;
         const category = item.product.category.name;
         const itemRevenue = item.price * item.quantity;
+        const productCost = productCostMap.get(productId) || 0;
 
         const existing = productRevenueMap.get(productId) || {
           name: productName,
           revenue: 0,
           quantity: 0,
           category,
+          cost: productCost,
         };
 
         productRevenueMap.set(productId, {
@@ -159,6 +237,7 @@ export class FinancialService {
           revenue: existing.revenue + itemRevenue,
           quantity: existing.quantity + item.quantity,
           category,
+          cost: productCost, // Use the fetched cost
         });
       });
     });
@@ -166,16 +245,27 @@ export class FinancialService {
     const topProducts = Array.from(productRevenueMap.values())
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 10)
-      .map((product, index) => ({
-        sNo: String(index + 1).padStart(2, "0"),
-        productId: Array.from(productRevenueMap.keys())[
-          Array.from(productRevenueMap.values()).indexOf(product)
-        ],
-        productName: product.name,
-        category: product.category,
-        revenue: product.revenue,
-        quantity: product.quantity,
-      }));
+      .map((product, index) => {
+        // Calculate profit: revenue - (cost × quantity)
+        const totalCost = product.cost * product.quantity;
+        const profit = product.revenue - totalCost;
+        // Calculate profit margin: (profit / revenue) × 100
+        const profitMargin =
+          product.revenue > 0 ? (profit / product.revenue) * 100 : 0;
+
+        return {
+          sNo: String(index + 1).padStart(2, "0"),
+          productId: Array.from(productRevenueMap.keys())[
+            Array.from(productRevenueMap.values()).indexOf(product)
+          ],
+          productName: product.name,
+          category: product.category,
+          revenue: product.revenue,
+          quantity: product.quantity,
+          profit: profit,
+          profitMargin: profitMargin,
+        };
+      });
 
     // Calculate previous period comparison
     const dateRange = toDate.getTime() - fromDate.getTime();
@@ -195,7 +285,7 @@ export class FinancialService {
 
     const previousPeriodRevenue = previousPeriodOrders.reduce(
       (sum, o) => sum + o.totalAmount,
-      0
+      0,
     );
 
     const growthPercentage =
@@ -209,6 +299,7 @@ export class FinancialService {
       summary: {
         totalRevenue,
         totalOrders,
+        totalCosts,
         completedOrders: completedOrders.length,
         cancelledOrders: cancelledOrders.length,
         inProcessOrders: inProcessOrders.length,
@@ -235,16 +326,19 @@ export class FinancialService {
     orders: any[],
     fromDate: Date,
     toDate: Date,
-    groupBy: "day" | "week" | "month" | "hour"
+    groupBy: "day" | "week" | "month" | "hour",
   ) {
-    const dataMap = new Map<string, { 
-      revenue: number; 
-      orders: number; 
-      refunds: number;
-      completedRevenue: number;
-      cancelledRevenue: number;
-      inProcessRevenue: number;
-    }>();
+    const dataMap = new Map<
+      string,
+      {
+        revenue: number;
+        orders: number;
+        refunds: number;
+        completedRevenue: number;
+        cancelledRevenue: number;
+        inProcessRevenue: number;
+      }
+    >();
 
     // Group orders by time period
     orders.forEach((order) => {
@@ -274,9 +368,9 @@ export class FinancialService {
           key = orderDate.toISOString().split("T")[0];
       }
 
-      const existing = dataMap.get(key) || { 
-        revenue: 0, 
-        orders: 0, 
+      const existing = dataMap.get(key) || {
+        revenue: 0,
+        orders: 0,
         refunds: 0,
         completedRevenue: 0,
         cancelledRevenue: 0,
@@ -295,17 +389,20 @@ export class FinancialService {
 
       // Add refunds
       if (order.returns && order.returns.length > 0) {
-        existing.refunds += order.returns.reduce((sum: number, r: any) => sum + r.refundedAmount, 0);
+        existing.refunds += order.returns.reduce(
+          (sum: number, r: any) => sum + r.refundedAmount,
+          0,
+        );
       }
 
       dataMap.set(key, existing);
     });
 
     // Fill in missing periods
-    const result: Array<{ 
-      date: string; 
-      revenue: number; 
-      orders: number; 
+    const result: Array<{
+      date: string;
+      revenue: number;
+      orders: number;
       refunds: number;
       completedRevenue: number;
       cancelledRevenue: number;
@@ -345,9 +442,9 @@ export class FinancialService {
           current.setDate(current.getDate() + 1);
       }
 
-      const data = dataMap.get(key) || { 
-        revenue: 0, 
-        orders: 0, 
+      const data = dataMap.get(key) || {
+        revenue: 0,
+        orders: 0,
         refunds: 0,
         completedRevenue: 0,
         cancelledRevenue: 0,
@@ -367,4 +464,3 @@ export class FinancialService {
     return result;
   }
 }
-
