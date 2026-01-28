@@ -267,7 +267,7 @@ export class FinancialService {
         };
       });
 
-    // Calculate previous period comparison
+    // Calculate previous period comparison (same length period before selected range)
     const dateRange = toDate.getTime() - fromDate.getTime();
     const previousFromDate = new Date(fromDate.getTime() - dateRange - 1);
     const previousToDate = new Date(fromDate.getTime() - 1);
@@ -288,10 +288,59 @@ export class FinancialService {
       0,
     );
 
-    const growthPercentage =
+    const previousPeriodOrdersCount = previousPeriodOrders.length;
+
+    const revenueGrowthPercentage =
       previousPeriodRevenue > 0
         ? ((totalRevenue - previousPeriodRevenue) / previousPeriodRevenue) * 100
-        : totalRevenue > 0
+        : previousPeriodRevenue === 0 && totalRevenue > 0
+          ? 100
+          : 0;
+
+    const ordersGrowthPercentage =
+      previousPeriodOrdersCount > 0
+        ? ((completedOrders.length - previousPeriodOrdersCount) / previousPeriodOrdersCount) * 100
+        : previousPeriodOrdersCount === 0 && completedOrders.length > 0
+          ? 100
+          : 0;
+
+    // Calculate same week last month comparison
+    const fromDateObj = new Date(fromDate);
+    const toDateObj = new Date(toDate);
+    const sameWeekLastMonthFrom = new Date(fromDateObj);
+    sameWeekLastMonthFrom.setMonth(fromDateObj.getMonth() - 1);
+    const sameWeekLastMonthTo = new Date(toDateObj);
+    sameWeekLastMonthTo.setMonth(toDateObj.getMonth() - 1);
+
+    const sameWeekLastMonthOrders = await prismaClient.order.findMany({
+      where: {
+        organizationId,
+        status: "COMPLETED",
+        createdAt: {
+          gte: sameWeekLastMonthFrom,
+          lte: sameWeekLastMonthTo,
+        },
+      },
+    });
+
+    const sameWeekLastMonthRevenue = sameWeekLastMonthOrders.reduce(
+      (sum, o) => sum + o.totalAmount,
+      0,
+    );
+
+    const sameWeekLastMonthOrdersCount = sameWeekLastMonthOrders.length;
+
+    const revenueVsLastMonthPercentage =
+      sameWeekLastMonthRevenue > 0
+        ? ((totalRevenue - sameWeekLastMonthRevenue) / sameWeekLastMonthRevenue) * 100
+        : sameWeekLastMonthRevenue === 0 && totalRevenue > 0
+          ? 100
+          : 0;
+
+    const ordersVsLastMonthPercentage =
+      sameWeekLastMonthOrdersCount > 0
+        ? ((completedOrders.length - sameWeekLastMonthOrdersCount) / sameWeekLastMonthOrdersCount) * 100
+        : sameWeekLastMonthOrdersCount === 0 && completedOrders.length > 0
           ? 100
           : 0;
 
@@ -316,8 +365,13 @@ export class FinancialService {
       topProducts,
       comparison: {
         previousPeriodRevenue,
-        growthPercentage,
-        previousPeriodOrders: previousPeriodOrders.length,
+        previousPeriodOrders: previousPeriodOrdersCount,
+        revenueGrowthPercentage,
+        ordersGrowthPercentage,
+        sameWeekLastMonthRevenue,
+        sameWeekLastMonthOrders: sameWeekLastMonthOrdersCount,
+        revenueVsLastMonthPercentage,
+        ordersVsLastMonthPercentage,
       },
     };
   }
