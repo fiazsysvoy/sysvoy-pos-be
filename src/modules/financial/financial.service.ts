@@ -2,9 +2,15 @@ import { prismaClient } from "../../lib/prisma.js";
 import { User } from "../../../generated/prisma/client.js";
 import { HttpError } from "../../utils/HttpError.js";
 import { z } from "zod";
-import { getFinancialStatsQuerySchema } from "./financial.schema.js";
+import {
+  getFinancialStatsQuerySchema,
+  getFinancialProductsQuerySchema,
+} from "./financial.schema.js";
 
 type GetFinancialStatsQuery = z.infer<typeof getFinancialStatsQuerySchema>;
+type GetFinancialProductsQuery = z.infer<
+  typeof getFinancialProductsQuerySchema
+>;
 
 export class FinancialService {
   async getFinancialStats(user: User, query: GetFinancialStatsQuery) {
@@ -244,7 +250,7 @@ export class FinancialService {
 
     const topProducts = Array.from(productRevenueMap.values())
       .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 10)
+      .slice(0, 5)
       .map((product, index) => {
         // Calculate profit: revenue - (cost × quantity)
         const totalCost = product.cost * product.quantity;
@@ -374,6 +380,111 @@ export class FinancialService {
         ordersVsLastMonthPercentage,
       },
     };
+  }
+
+  async getAllProductsReport(user: User, query: GetFinancialProductsQuery) {
+    const organizationId = user.organizationId;
+    if (!organizationId) {
+      throw new HttpError("User does not belong to any organization", 400);
+    }
+
+    const { fromDate, toDate } = query;
+
+    const completedOrders = await prismaClient.order.findMany({
+      where: {
+        organizationId,
+        status: "COMPLETED",
+        createdAt: { gte: fromDate, lte: toDate },
+      },
+      include: {
+        items: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                category: { select: { name: true } },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    const allProductIds = new Set<string>();
+    completedOrders.forEach((o) => {
+      o.items.forEach((item) => allProductIds.add(item.productId));
+    });
+
+    const productsWithCosts = await prismaClient.product.findMany({
+      where: {
+        id: { in: Array.from(allProductIds) },
+        organizationId,
+      },
+      select: { id: true, cost: true },
+    });
+    const productCostMap = new Map<string, number>();
+    productsWithCosts.forEach((p) => productCostMap.set(p.id, p.cost ?? 0));
+
+    const productRevenueMap = new Map<
+      string,
+      {
+        name: string;
+        revenue: number;
+        quantity: number;
+        category: string;
+        cost: number;
+      }
+    >();
+
+    completedOrders.forEach((order) => {
+      order.items.forEach((item) => {
+        const productId = item.productId;
+        const productName = item.product.name;
+        const category = item.product.category.name;
+        const itemRevenue = item.price * item.quantity;
+        const productCost = productCostMap.get(productId) ?? 0;
+        const existing = productRevenueMap.get(productId) ?? {
+          name: productName,
+          revenue: 0,
+          quantity: 0,
+          category,
+          cost: productCost,
+        };
+        productRevenueMap.set(productId, {
+          name: existing.name,
+          revenue: existing.revenue + itemRevenue,
+          quantity: existing.quantity + item.quantity,
+          category: existing.category,
+          cost: productCost,
+        });
+      });
+    });
+
+    const products = Array.from(productRevenueMap.entries())
+      .map(([productId, p]) => {
+        const totalCost = p.cost * p.quantity;
+        const profit = p.revenue - totalCost;
+        const profitMargin =
+          p.revenue > 0 ? (profit / p.revenue) * 100 : 0;
+        return {
+          productId,
+          productName: p.name,
+          category: p.category,
+          revenue: p.revenue,
+          quantity: p.quantity,
+          profit,
+          profitMargin,
+        };
+      })
+      .sort((a, b) => b.revenue - a.revenue)
+      .map((p, index) => ({
+        ...p,
+        sNo: String(index + 1).padStart(2, "0"),
+      }));
+
+    return products;
   }
 
   private generateTimeSeriesData(
