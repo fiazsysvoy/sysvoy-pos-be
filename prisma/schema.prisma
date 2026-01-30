@@ -146,6 +146,7 @@ model Order {
   id          String      @id @default(uuid())
   name        String      @default("Order")
   totalAmount Float
+  discount    Float       @default(0) // Discount amount to subtract from total
   status      OrderStatus @default(IN_PROCESS)
 
   // Payment fields

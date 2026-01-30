@@ -9,7 +9,7 @@ import {
 
 export class OrderService {
   async createFromWebhook(organizationId: string, data: CreateOrderData & { source?: string; externalOrderId?: string }) {
-    const { items, name, source, externalOrderId } = data;
+    const { items, name, source, externalOrderId, discount = 0 } = data;
 
     // Validate products and calculate total
     const productIds = items.map((item) => item.productId);
@@ -35,19 +35,19 @@ export class OrderService {
       }
     }
 
-    let totalAmount = 0;
+    let subtotal = 0;
     const orderItems: Array<{
       productId: string;
       quantity: number;
       price: number;
     }> = [];
 
-    // Calculate total and prepare order items
+    // Calculate subtotal and prepare order items
     for (const item of items) {
       const product = products.find((p) => p.id === item.productId);
       if (product) {
         const itemTotal = product.price * item.quantity;
-        totalAmount += itemTotal;
+        subtotal += itemTotal;
         orderItems.push({
           productId: item.productId,
           quantity: item.quantity,
@@ -56,12 +56,17 @@ export class OrderService {
       }
     }
 
+    // Calculate totalAmount after applying discount
+    const discountAmount = discount || 0;
+    const totalAmount = Math.max(0, subtotal - discountAmount);
+
     // Create order with items in a transaction
     const result = await prismaClient.$transaction(async (tx) => {
       // Create order
       const order = await tx.order.create({
         data: {
           totalAmount,
+          discount: discountAmount,
           name: name || "Webhook Order",
           source: source || "WEBHOOK",
           status: "COMPLETED",
@@ -167,7 +172,7 @@ export class OrderService {
   }
 
   async create(user: User, data: CreateOrderData) {
-    const { items, name, paymentMethod } = data;
+    const { items, name, paymentMethod, discount = 0 } = data;
 
     // Validate products and calculate total
     const productIds = items.map((item) => item.productId);
@@ -190,19 +195,19 @@ export class OrderService {
       }
     }
 
-    let totalAmount = 0;
+    let subtotal = 0;
     const orderItems: Array<{
       productId: string;
       quantity: number;
       price: number;
     }> = [];
 
-    // Calculate total and prepare order items
+    // Calculate subtotal and prepare order items
     for (const item of items) {
       const product = products.find((p) => p.id === item.productId);
       if (product) {
         const itemTotal = product.price * item.quantity;
-        totalAmount += itemTotal;
+        subtotal += itemTotal;
         orderItems.push({
           productId: item.productId,
           quantity: item.quantity,
@@ -211,12 +216,17 @@ export class OrderService {
       }
     }
 
+    // Calculate totalAmount after applying discount
+    const discountAmount = discount || 0;
+    const totalAmount = Math.max(0, subtotal - discountAmount);
+
     // Create order with items in a transaction
     const result = await prismaClient.$transaction(async (tx) => {
       // Create order
       const order = await tx.order.create({
         data: {
           totalAmount,
+          discount: discountAmount,
           name: name || "Order",
           paymentMethod: paymentMethod || "CASH",
           paymentStatus: paymentMethod === "CASH" ? "PENDING" : "PENDING",
@@ -366,7 +376,7 @@ export class OrderService {
       throw new HttpError("User does not belong to any organization", 400);
     }
 
-    const { items, name } = data;
+    const { items, name, discount } = data;
 
     return prismaClient.$transaction(async (tx) => {
       const order = await tx.order.findUnique({
@@ -501,13 +511,18 @@ export class OrderService {
         newTotalAmount += product.price * item.quantity;
       }
 
-      // Update order total amount
+      // Use provided discount or keep existing discount
+      const discountAmount = discount !== undefined ? discount : (order.discount || 0);
+      const finalTotalAmount = Math.max(0, newTotalAmount - discountAmount);
+
+      // Update order total amount and discount
       const updatedOrder = await tx.order.update({
         where: { id_organizationId: { id: orderId, organizationId } },
         data: {
           // if name is not provided dont pass it to update
           name: name || undefined,
-          totalAmount: newTotalAmount,
+          totalAmount: finalTotalAmount,
+          discount: discountAmount,
         },
         include: {
           items: {

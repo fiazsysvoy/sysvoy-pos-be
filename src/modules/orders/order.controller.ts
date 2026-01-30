@@ -68,9 +68,10 @@ export const updateOrderItems = asyncHandler(
         .json({ errors: parsedParams.error.issues.map((i) => i.message) });
     }
 
-    const { items, name } = req.body as {
+    const { items, name, discount } = req.body as {
       items?: Array<{ productId: string; quantity: number }>;
       name: string;
+      discount?: number;
     };
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({
@@ -81,7 +82,7 @@ export const updateOrderItems = asyncHandler(
     const updatedOrder = await orderService.updateItems(
       req.user!,
       parsedParams.data.id,
-      { items, name }
+      { items, name, discount }
     );
 
     res.json({

@@ -6,6 +6,7 @@ export interface CreateOrderData {
   }>;
   paymentMethod?: "CASH" | "JAZZCASH" | "EASYPAISA";
   customerPhone?: string;
+  discount?: number;
 }
 
 export interface UpdateOrderItemsData {
@@ -14,6 +15,7 @@ export interface UpdateOrderItemsData {
     productId: string;
     quantity: number;
   }>;
+  discount?: number;
 }
 
 export interface ReturnOrderData {

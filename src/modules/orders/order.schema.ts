@@ -17,6 +17,11 @@ export const createOrderSchema = z.object({
   name: z.string("Order must have a name").optional(),
   paymentMethod: z.enum(["CASH", "JAZZCASH", "EASYPAISA"]).optional(),
   customerPhone: z.string().optional(),
+  discount: z
+    .number()
+    .min(0, "Discount cannot be negative")
+    .optional()
+    .default(0),
 });
 
 export const updateOrderSchema = z.object({
@@ -38,6 +43,11 @@ export const updateOrderItemsSchema = z.object({
       }),
     )
     .min(1, "Order must contain at least one item"),
+  discount: z
+    .number()
+    .min(0, "Discount cannot be negative")
+    .optional()
+    .default(0),
 });
 
 export const returnItemSchema = z.object({
