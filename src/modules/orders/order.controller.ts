@@ -174,8 +174,6 @@ export const getRevenueStats = asyncHandler(
 
 export const printOrder = asyncHandler(async (req: Request, res: Response) => {
   const parsed = orderIdParamSchema.safeParse(req.params);
-  console.log("request params data", req.params);
-  console.log("request query data", req.query);
   const user = req.user!;
 
   if (!parsed.success) {

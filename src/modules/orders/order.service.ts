@@ -1,5 +1,9 @@
 import { prismaClient } from "../../lib/prisma.js";
-import { Order, User, Prisma as PrismaTypes } from "../../../generated/prisma/client.js";
+import {
+  Order,
+  User,
+  Prisma as PrismaTypes,
+} from "../../../generated/prisma/client.js";
 import { HttpError } from "../../utils/HttpError.js";
 import {
   CreateOrderData,
@@ -8,7 +12,10 @@ import {
 } from "./order.types.js";
 
 export class OrderService {
-  async createFromWebhook(organizationId: string, data: CreateOrderData & { source?: string; externalOrderId?: string }) {
+  async createFromWebhook(
+    organizationId: string,
+    data: CreateOrderData & { source?: string; externalOrderId?: string },
+  ) {
     const { items, name, source, externalOrderId, discount = 0 } = data;
 
     // Validate products and calculate total
@@ -30,7 +37,7 @@ export class OrderService {
       if (!product || product.stock < item.quantity) {
         throw new HttpError(
           `Insufficient stock for product: ${product?.name || item.productId}`,
-          400
+          400,
         );
       }
     }
@@ -118,7 +125,7 @@ export class OrderService {
   async cancelExternalOrder(
     externalOrderId: string,
     source: string,
-    organizationId: string
+    organizationId: string,
   ) {
     return prismaClient.$transaction(async (tx) => {
       // Find the order by externalOrderId and source
@@ -134,7 +141,7 @@ export class OrderService {
       if (!order) {
         throw new HttpError(
           `Order not found with externalOrderId: ${externalOrderId}`,
-          404
+          404,
         );
       }
 
@@ -190,7 +197,7 @@ export class OrderService {
       if (!product || product.stock < item.quantity) {
         throw new HttpError(
           `Insufficient stock for product: ${product?.name || item.productId}`,
-          400
+          400,
         );
       }
     }
@@ -344,7 +351,7 @@ export class OrderService {
         if (order.paymentStatus !== "COMPLETED") {
           throw new HttpError(
             `Order cannot be completed. Payment must be completed first. Current payment status: ${order.paymentStatus || "PENDING"}`,
-            400
+            400,
           );
         }
 
@@ -366,11 +373,7 @@ export class OrderService {
     });
   }
 
-  async updateItems(
-    user: User,
-    orderId: string,
-    data: UpdateOrderItemsData,
-  ) {
+  async updateItems(user: User, orderId: string, data: UpdateOrderItemsData) {
     const organizationId = user.organizationId;
     if (!organizationId) {
       throw new HttpError("User does not belong to any organization", 400);
@@ -512,7 +515,8 @@ export class OrderService {
       }
 
       // Use provided discount or keep existing discount
-      const discountAmount = discount !== undefined ? discount : (order.discount || 0);
+      const discountAmount =
+        discount !== undefined ? discount : order.discount || 0;
       const finalTotalAmount = Math.max(0, newTotalAmount - discountAmount);
 
       // Update order total amount and discount
@@ -679,7 +683,11 @@ export class OrderService {
       include: {
         items: {
           include: {
-            product: true,
+            product: {
+              select: {
+                name: true,
+              },
+            },
           },
         },
         createdBy: {
@@ -729,7 +737,7 @@ export class OrderService {
 
     for (const returnItem of items) {
       const orderItem = order.items.find(
-        (item) => item.id === returnItem.orderItemId
+        (item) => item.id === returnItem.orderItemId,
       );
       if (!orderItem) {
         throw new HttpError(`Order item ${returnItem.orderItemId} not found`);
@@ -742,18 +750,18 @@ export class OrderService {
 
       const totalReturned = existingReturns.reduce(
         (sum, ret) => sum + ret.quantity,
-        0
+        0,
       );
       const availableToReturn = orderItem.quantity - totalReturned;
 
       if (returnItem.quantity > availableToReturn) {
         if (availableToReturn === 0) {
           throw new HttpError(
-            `Cannot return ${returnItem.quantity} items. Order item: ${orderItem.product.name} has already been returned`
+            `Cannot return ${returnItem.quantity} items. Order item: ${orderItem.product.name} has already been returned`,
           );
         }
         throw new HttpError(
-          `Cannot return ${returnItem.quantity} items. Only ${availableToReturn} could be returned`
+          `Cannot return ${returnItem.quantity} items. Only ${availableToReturn} could be returned`,
         );
       }
 
@@ -831,7 +839,11 @@ export class OrderService {
 
     // Get start of today, this week, and this month
     const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfToday = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+    );
 
     // Start of week (Monday)
     const startOfWeek = new Date(now);
@@ -843,7 +855,14 @@ export class OrderService {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
     // Calculate revenue for each period (only COMPLETED orders)
-    const [todayRevenue, weekRevenue, monthRevenue, todayOrders, weekOrders, monthOrders] = await Promise.all([
+    const [
+      todayRevenue,
+      weekRevenue,
+      monthRevenue,
+      todayOrders,
+      weekOrders,
+      monthOrders,
+    ] = await Promise.all([
       // Today's revenue
       prismaClient.order.aggregate({
         where: {
@@ -949,23 +968,24 @@ export class OrderService {
       const hourKey = `${date.getHours()}:00`;
       hourlyRevenueMap.set(
         hourKey,
-        (hourlyRevenueMap.get(hourKey) || 0) + order.totalAmount
+        (hourlyRevenueMap.get(hourKey) || 0) + order.totalAmount,
       );
-      hourlySalesMap.set(
-        hourKey,
-        (hourlySalesMap.get(hourKey) || 0) + 1
-      );
+      hourlySalesMap.set(hourKey, (hourlySalesMap.get(hourKey) || 0) + 1);
     });
 
     // Generate hourly data for today (last 12 hours, or all hours today if less than 12)
-    const todayHourlyData: Array<{ time: string; revenue: number; sales: number }> = [];
+    const todayHourlyData: Array<{
+      time: string;
+      revenue: number;
+      sales: number;
+    }> = [];
     const currentHour = now.getHours();
     const hoursSinceMidnight = currentHour + 1;
     const hoursToShow = Math.min(12, hoursSinceMidnight);
     const startHour = Math.max(0, currentHour - hoursToShow + 1);
 
     for (let h = startHour; h <= currentHour; h++) {
-      const hourKey = `${String(h).padStart(2, '0')}:00`;
+      const hourKey = `${String(h).padStart(2, "0")}:00`;
       todayHourlyData.push({
         time: hourKey,
         revenue: hourlyRevenueMap.get(`${h}:00`) || 0,
@@ -980,20 +1000,32 @@ export class OrderService {
       const dateKey = order.createdAt.toISOString().split("T")[0];
       weekDailyRevenueMap.set(
         dateKey,
-        (weekDailyRevenueMap.get(dateKey) || 0) + order.totalAmount
+        (weekDailyRevenueMap.get(dateKey) || 0) + order.totalAmount,
       );
-      weekDailySalesMap.set(
-        dateKey,
-        (weekDailySalesMap.get(dateKey) || 0) + 1
-      );
+      weekDailySalesMap.set(dateKey, (weekDailySalesMap.get(dateKey) || 0) + 1);
     });
 
     // Generate daily data for this week (Monday to today, inclusive)
-    const weekDailyData: Array<{ date: string; revenue: number; sales: number }> = [];
+    const weekDailyData: Array<{
+      date: string;
+      revenue: number;
+      sales: number;
+    }> = [];
     // Calculate days from Monday to today (inclusive)
-    const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const mondayDate = new Date(startOfWeek.getFullYear(), startOfWeek.getMonth(), startOfWeek.getDate());
-    const daysSinceMonday = Math.floor((todayDate.getTime() - mondayDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const todayDate = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+    );
+    const mondayDate = new Date(
+      startOfWeek.getFullYear(),
+      startOfWeek.getMonth(),
+      startOfWeek.getDate(),
+    );
+    const daysSinceMonday =
+      Math.floor(
+        (todayDate.getTime() - mondayDate.getTime()) / (1000 * 60 * 60 * 24),
+      ) + 1;
     const daysToShow = Math.min(7, daysSinceMonday);
 
     for (let i = 0; i < daysToShow; i++) {
@@ -1002,8 +1034,8 @@ export class OrderService {
       date.setHours(0, 0, 0, 0); // Normalize to start of day
       // Use local date components to avoid timezone issues
       const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
       const dateKey = `${year}-${month}-${day}`;
       weekDailyData.push({
         date: dateKey,
@@ -1022,16 +1054,21 @@ export class OrderService {
       const weekKey = Math.min(weekOfMonth, 4); // Cap at 4 weeks
       monthWeeklyRevenueMap.set(
         weekKey,
-        (monthWeeklyRevenueMap.get(weekKey) || 0) + order.totalAmount
+        (monthWeeklyRevenueMap.get(weekKey) || 0) + order.totalAmount,
       );
       monthWeeklySalesMap.set(
         weekKey,
-        (monthWeeklySalesMap.get(weekKey) || 0) + 1
+        (monthWeeklySalesMap.get(weekKey) || 0) + 1,
       );
     });
 
     // Generate weekly data for this month (W1, W2, W3, W4)
-    const monthDailyData: Array<{ date: string; revenue: number; sales: number; week?: number }> = [];
+    const monthDailyData: Array<{
+      date: string;
+      revenue: number;
+      sales: number;
+      week?: number;
+    }> = [];
     const currentWeekOfMonth = Math.ceil(now.getDate() / 7);
     const weeksToShow = Math.min(4, currentWeekOfMonth);
 
@@ -1073,14 +1110,31 @@ export class OrderService {
     });
 
     // Generate data for last 12 months
-    const monthNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
-    const historicalMonthlyData: Array<{ month: string; revenue: number; sales: number }> = [];
-    
+    const monthNames = [
+      "JAN",
+      "FEB",
+      "MAR",
+      "APR",
+      "MAY",
+      "JUN",
+      "JUL",
+      "AUG",
+      "SEP",
+      "OCT",
+      "NOV",
+      "DEC",
+    ];
+    const historicalMonthlyData: Array<{
+      month: string;
+      revenue: number;
+      sales: number;
+    }> = [];
+
     for (let i = 11; i >= 0; i--) {
       const targetDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const monthKey = `${targetDate.getFullYear()}-${targetDate.getMonth()}`;
       const monthData = monthlyMap.get(monthKey) || { revenue: 0, sales: 0 };
-      
+
       historicalMonthlyData.push({
         month: monthNames[targetDate.getMonth()],
         revenue: monthData.revenue,
