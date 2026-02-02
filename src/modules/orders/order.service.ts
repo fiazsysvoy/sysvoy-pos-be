@@ -669,6 +669,38 @@ export class OrderService {
     return order;
   }
 
+  async getByIdForPrint(id: string, user: User) {
+    const organizationId = user.organizationId;
+    if (!organizationId) {
+      throw new HttpError("User does not belong to any organization", 400);
+    }
+    const order = await prismaClient.order.findUnique({
+      where: { id, organizationId },
+      include: {
+        items: {
+          include: {
+            product: true,
+          },
+        },
+        createdBy: {
+          select: {
+            name: true,
+            email: true,
+          },
+        },
+        organization: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    });
+    if (!order) {
+      throw new HttpError("Order not found", 404);
+    }
+    return order;
+  }
+
   async returnItems(user: User, data: ReturnOrderData) {
     const { orderId, items } = data;
 

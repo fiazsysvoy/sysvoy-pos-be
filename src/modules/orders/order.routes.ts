@@ -12,6 +12,9 @@ router.get("/stats/revenue", orderController.getRevenueStats);
 // get order by id
 router.get("/:id", orderController.getOrderById);
 
+// print order (PDF)
+router.get("/:id/print", orderController.printOrder);
+
 // update order
 router.patch("/:id", orderController.updateOrder);
 

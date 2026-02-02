@@ -8,6 +8,7 @@ import {
   updateOrderSchema,
 } from "./order.schema.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
+import { buildOrderPdf } from "./orderPdf.js";
 
 const orderService = new OrderService();
 
@@ -48,7 +49,7 @@ export const updateOrder = asyncHandler(async (req: Request, res: Response) => {
   const order = await orderService.update(
     req.user!,
     parsedParams.data.id,
-    parsedBody.data
+    parsedBody.data,
   );
 
   res.json({
@@ -82,7 +83,7 @@ export const updateOrderItems = asyncHandler(
     const updatedOrder = await orderService.updateItems(
       req.user!,
       parsedParams.data.id,
-      { items, name, discount }
+      { items, name, discount },
     );
 
     res.json({
@@ -90,7 +91,7 @@ export const updateOrderItems = asyncHandler(
       message: "Order items updated successfully",
       data: updatedOrder,
     });
-  }
+  },
 );
 
 export const getAllOrders = asyncHandler(
@@ -110,7 +111,7 @@ export const getAllOrders = asyncHandler(
       success: true,
       data: result,
     });
-  }
+  },
 );
 
 export const getOrderById = asyncHandler(
@@ -137,7 +138,7 @@ export const getOrderById = asyncHandler(
       success: true,
       data: order,
     });
-  }
+  },
 );
 
 export const returnOrderItems = asyncHandler(
@@ -157,7 +158,7 @@ export const returnOrderItems = asyncHandler(
       message: "Items returned successfully",
       data: returnRecord,
     });
-  }
+  },
 );
 
 export const getRevenueStats = asyncHandler(
@@ -168,5 +169,38 @@ export const getRevenueStats = asyncHandler(
       success: true,
       data: stats,
     });
-  }
+  },
 );
+
+export const printOrder = asyncHandler(async (req: Request, res: Response) => {
+  const parsed = orderIdParamSchema.safeParse(req.params);
+  console.log("request params data", req.params);
+  console.log("request query data", req.query);
+  const user = req.user!;
+
+  if (!parsed.success) {
+    return res
+      .status(400)
+      .json({ errors: parsed.error.issues.map((i) => i.message) });
+  }
+
+  const order = await orderService.getByIdForPrint(parsed.data.id, user);
+  const pdfBuffer = await buildOrderPdf(order);
+
+  // Use order name and order number for filename (sanitize for safety)
+  const safeName = (order.name || "Order").replace(/[^a-zA-Z0-9-_]/g, "_");
+  const orderNumber = order.id.slice(-3).padStart(3, "0");
+  const filename = `${safeName}-${orderNumber}.pdf`;
+
+  // Check if download is requested via query param
+  const isDownload = req.query.download === "true";
+  const disposition = isDownload ? "attachment" : "inline";
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader(
+    "Content-Disposition",
+    `${disposition}; filename="${filename}"`,
+  );
+  res.setHeader("Content-Length", String(pdfBuffer.length));
+  res.send(pdfBuffer);
+});
