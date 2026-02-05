@@ -7,6 +7,7 @@ import {
   getProductById,
   updateProduct,
   deleteProduct,
+  getLowStockProducts,
 } from "./product.controller.js";
 
 const router = Router();
@@ -20,6 +21,9 @@ router.post(
 
 // Get all products (paginated, searchable)
 router.get("/", getProducts);
+
+// Get low stock products
+router.get("/low-stock", getLowStockProducts);
 
 // Get product by ID
 router.get("/:id", getProductById);

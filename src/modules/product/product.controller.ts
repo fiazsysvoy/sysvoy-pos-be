@@ -109,3 +109,11 @@ export const deleteProduct = asyncHandler(
     res.status(204).send();
   },
 );
+
+// GET /products/low-stock
+export const getLowStockProducts = asyncHandler(
+  async (req: Request, res: Response) => {
+    const result = await productService.getLowStockProducts(req.user!);
+    res.json({ success: true, data: result });
+  },
+);

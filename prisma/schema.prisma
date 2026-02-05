@@ -78,6 +78,7 @@ model Organization {
 
   clientSecret     String?           @unique @default(uuid())
   integrationTeams IntegrationTeam[]
+  lowStockThreshold Int @default(10) // Threshold for low stock alerts
 }
 
 model Category {

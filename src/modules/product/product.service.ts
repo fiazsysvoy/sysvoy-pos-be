@@ -222,4 +222,44 @@ export class ProductService {
       where: { id },
     });
   }
+  async getLowStockProducts(user: User) {
+    const organizationId = user.organizationId;
+    if (!organizationId) {
+      throw new HttpError("User does not belong to any organization", 400);
+    }
+
+    // Get organization's low stock threshold
+    const organization = await prismaClient.organization.findUnique({
+      where: { id: organizationId },
+      select: { lowStockThreshold: true },
+    });
+
+    if (!organization) {
+      throw new HttpError("Organization not found", 404);
+    }
+
+    const threshold = organization.lowStockThreshold || 10;
+
+    // Find products with stock less than or equal to threshold
+    const lowStockProducts = await prismaClient.product.findMany({
+      where: {
+        organizationId,
+        stock: {
+          lte: threshold,
+        },
+      },
+      include: {
+        category: true,
+      },
+      orderBy: {
+        stock: "asc", // Order by stock ascending
+      },
+    });
+
+    return {
+      threshold,
+      count: lowStockProducts.length,
+      products: lowStockProducts,
+    };
+  }
 }
